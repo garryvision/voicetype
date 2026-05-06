@@ -1,4 +1,4 @@
-# VoiceType — Swift macOS voice-to-text
+# VoiceType : Swift macOS voice-to-text
 APP_NAME := VoiceType
 BUNDLE := dist/$(APP_NAME).app
 SIGN_IDENTITY ?= -
@@ -8,12 +8,12 @@ FRAMEWORKS := -framework AppKit -framework AVFoundation -framework Quartz \
 
 .PHONY: build install run stop uninstall clean
 
-## Build — compile + bundle + sign
+## Build : compile + bundle + sign
 build:
 	@mkdir -p dist/$(APP_NAME).app/Contents/MacOS
 	swiftc -o dist/$(APP_NAME) $(FRAMEWORKS) -O $(SWIFT_FILES)
 	@cp dist/$(APP_NAME) $(BUNDLE)/Contents/MacOS/$(APP_NAME)
-	@cp dist/$(APP_NAME).app/Contents/Info.plist $(BUNDLE)/Contents/Info.plist 2>/dev/null || \
+	@if [ ! -f $(BUNDLE)/Contents/Info.plist ]; then \
 		/usr/libexec/PlistBuddy \
 			-c "Add :CFBundleName string $(APP_NAME)" \
 			-c "Add :CFBundleIdentifier string com.clement.voicetype" \
@@ -24,18 +24,19 @@ build:
 			-c "Add :LSMinimumSystemVersion string 14.0" \
 			-c "Add :NSMicrophoneUsageDescription string VoiceType needs microphone access." \
 			-c "Add :NSHighResolutionCapable bool true" \
-			$(BUNDLE)/Contents/Info.plist
-	@codesign --force --deep --sign "$(SIGN_IDENTITY)" $(BUNDLE)
+			$(BUNDLE)/Contents/Info.plist ; \
+	fi
+	@codesign --force --sign "$(SIGN_IDENTITY)" $(BUNDLE)
 	@xattr -cr $(BUNDLE)
-	@echo "✅ Built + signed with $(SIGN_IDENTITY)"
+	@echo "Built and signed with $(SIGN_IDENTITY)"
 
-## Install — copy to /Applications
+## Install : copy to /Applications
 install: build
 	@killall $(APP_NAME) 2>/dev/null || true
 	@sleep 1
 	@rm -rf /Applications/$(APP_NAME).app
 	@cp -R $(BUNDLE) /Applications/
-	@echo "✅ Installed — run: make run"
+	@echo "Installed. Run: make run"
 
 ## Run
 run:
