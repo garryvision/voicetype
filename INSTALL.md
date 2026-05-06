@@ -1,154 +1,198 @@
 # Installer VoiceType
 
-VoiceType est un outil de dictee vocale local pour macOS. Tu maintiens la touche Fn (Globe, en bas a gauche du clavier), tu parles, tu relaches : le texte arrive dans l'application ou ton curseur est. Toute la transcription se passe sur ton Mac, sans connexion internet (sauf le telechargement initial du modele).
+VoiceType te permet de dicter a voix haute dans n'importe quelle application Mac (Notes, Mail, Slack, navigateur, code editor). Tu maintiens une touche, tu parles, le texte s'ecrit la ou ton curseur est. Tout reste sur ton Mac, rien ne part sur internet (sauf le telechargement initial du modele de transcription). C'est une alternative gratuite a Wispr Flow et Superwhisper, qui sont autour de 15 euros par mois.
 
-Compte 15 a 25 minutes pour l'installation complete : 5 minutes de commandes, 10 a 15 minutes de telechargement automatique du modele, 5 minutes pour autoriser les permissions.
+Compte 30 a 45 minutes pour la premiere installation : 5 a 10 minutes de commandes, 15 a 30 minutes de telechargements automatiques (selon ta connexion), 5 minutes pour autoriser 3 permissions macOS. Tu peux laisser tourner et faire autre chose.
 
-## Avant de commencer
+Tu ne peux rien casser. Si tu bloques quelque part, ping Clement avec une capture d'ecran, on debloque ensemble. La desinstallation est propre, en une commande (voir tout en bas de cette page).
 
-- Mac sous macOS 14 (Sonoma) ou plus recent. Verifie via Menu Pomme > A propos de ce Mac.
+## Pre-requis
+
+- Mac sous macOS 14 (Sonoma) ou plus recent. Verifie : Menu Pomme > A propos de ce Mac.
 - Apple Silicon recommande (M1, M2, M3, M4). Intel fonctionne mais c'est plus lent.
-- 3 GB d'espace disque libre (1.5 GB pour le modele Whisper, le reste pour les outils).
-- Une connexion internet stable au premier lancement (telechargement du modele).
-- Un micro (le micro interne du Mac suffit, externe c'est mieux).
+- 4 GB d'espace disque libre (1.5 GB pour le modele de transcription, le reste pour les outils Apple et Homebrew).
+- Une connexion internet stable.
+- Un micro (le micro interne du Mac suffit, externe c'est mieux pour la qualite).
 
-## Installation
+## Avant de commencer : installer les outils Apple
 
-Tu as deux options. La premiere est plus simple si tu utilises VS Code et Claude Code.
+Cette etape est manuelle, gratuite, et indispensable. Elle prend 5 a 15 minutes selon ta connexion.
 
-### Option 1 : Avec Claude Code (recommandee)
+Ouvre l'application Terminal (touche Cmd, qui est la touche commande en bas a cote de la barre espace, plus la barre Espace, tape "Terminal", appuie Entree).
 
-1. Telecharge le code source dans le terminal :
+Colle cette commande, appuie Entree :
+
+```
+xcode-select --install
+```
+
+Une fenetre Apple s'ouvre. Clique le bouton bleu **Installer**, puis Accepter sur les conditions. Attends que le telechargement se termine. Quand la fenetre Apple disparait, c'est bon.
+
+Si le terminal te dit "command line tools are already installed", c'est qu'ils sont deja la. Tu peux passer a la suite.
+
+## Installation : 2 options
+
+Choisis selon ce que tu utilises au quotidien.
+
+### Option 1 : Avec Claude Code (le plus simple)
+
+Si tu utilises VS Code et Claude Code dans ton travail, c'est le chemin le plus court : Claude Code va lire les instructions du projet et te tenir la main etape par etape.
+
+1. Dans le Terminal, telecharge le code source :
 
    ```
    cd ~/Downloads
    git clone https://github.com/garryvision/voicetype.git
    ```
 
-2. Ouvre le dossier dans VS Code :
+2. Ouvre le dossier dans VS Code. Soit via le terminal :
 
    ```
    code ~/Downloads/voicetype
    ```
 
-3. Lance Claude Code dans VS Code (raccourci Cmd+Esc ou via le menu).
+   Si la commande `code` n'est pas reconnue (`command not found: code`) : ouvre VS Code a la main, puis menu **File** > **Open Folder**, navigue jusqu'a Downloads/voicetype, clique Ouvrir.
+
+3. Dans VS Code, lance Claude Code (raccourci Cmd+Esc, ou via la palette de commandes Cmd+Shift+P et taper "Claude Code").
 
 4. Tape simplement : `installe VoiceType`
 
-   Claude Code va lire le fichier `CLAUDE.md` du repo et te guider etape par etape. Il te dira quand cliquer ou. Si quelque chose plante, demande lui de t'aider.
+   Claude Code va lire le fichier `CLAUDE.md` du projet et te guider de bout en bout. Si quelque chose plante, demande lui simplement de t'aider.
 
-### Option 2 : A la main dans le terminal
+### Option 2 : A la main dans le Terminal
 
-Ouvre l'application Terminal (Cmd + Espace, tape "Terminal", Entree).
+Si tu n'utilises pas Claude Code, suis cette procedure manuelle. Elle marche tout autant.
 
-Copie cette commande, colle dans le Terminal, Entree :
+Dans le Terminal, colle ces commandes une par une, en appuyant Entree apres chaque ligne :
 
 ```
-cd ~/Downloads && git clone https://github.com/garryvision/voicetype.git && cd voicetype && bash scripts/install.sh
+cd ~/Downloads
+git clone https://github.com/garryvision/voicetype.git
+cd voicetype
+bash scripts/install.sh
 ```
 
 Le script va :
 
 1. Verifier ton Mac et ton macOS.
-2. Te demander d'installer les Xcode Command Line Tools si tu ne les as pas (une boite Apple s'ouvre, clique "Installer", attends, relance la commande ci-dessus).
+2. Verifier les outils Apple (deja installes a l'etape "Avant de commencer").
 3. Installer Homebrew si tu ne l'as pas. Ton mot de passe Mac sera demande.
-4. Installer les outils dont VoiceType a besoin (whisper-cpp, ffmpeg).
-5. Compiler VoiceType et l'installer dans Applications.
+4. Installer les outils dont VoiceType a besoin : `whisper-cpp` pour la transcription, `ffmpeg` pour le micro.
+5. Telecharger le modele de transcription (1.5 GB). Une barre de progression s'affiche. Si la connexion coupe, relance la commande `bash scripts/install.sh`, le telechargement reprendra ou il s'est arrete.
+6. Compiler VoiceType et l'installer dans Applications.
 
-Compte 5 a 10 minutes.
+Compte 15 a 35 minutes pour cette etape.
 
-## Autoriser les permissions
+## Autoriser les 3 permissions macOS
 
-VoiceType a besoin de 3 permissions macOS. Cette etape est manuelle, tu dois cliquer toi meme.
+Trois permissions sont necessaires. Cette etape est manuelle, tu dois cliquer toi meme.
 
-### 1. Microphone
+### Etape 1 : lance l'app
 
-Lance l'app :
+Dans le Terminal :
 
 ```
 open /Applications/VoiceType.app
 ```
 
-Une boite Apple va demander l'acces au microphone : clique "Autoriser".
+Si macOS te dit "VoiceType cannot be opened because the developer cannot be verified" (frequent sur macOS 15 et plus recent) : va dans **Reglages systeme** > **Confidentialite et securite**, descend tout en bas, tu verras un message sur VoiceType avec un bouton **Ouvrir quand meme**. Clique. Confirme avec ton mot de passe Mac. L'app va ensuite se lancer.
+
+### Permission 1 : Microphone
+
+Une fenetre Apple va apparaitre automatiquement : "VoiceType veut acceder au microphone". Clique **Autoriser**.
 
 Si tu rates le prompt : Reglages systeme > Confidentialite et securite > Microphone, active la ligne VoiceType.
 
-### 2. Accessibilite
+### Permission 2 : Accessibilite
 
-Reglages systeme > Confidentialite et securite > Accessibilite.
+Reglages systeme > Confidentialite et securite > **Accessibilite**.
 
-Clique le cadenas en bas a gauche, tape ton mot de passe Mac. Clique le bouton "+", choisis VoiceType dans Applications, valide. Active l'interrupteur a cote de VoiceType.
+Clique le cadenas en bas a gauche, tape ton mot de passe Mac. Clique le bouton **+** (au-dessus de la liste), choisis **VoiceType** dans Applications, clique Ouvrir. Verifie que l'interrupteur a cote de VoiceType est sur on (bleu).
 
-### 3. Surveillance des entrees
+### Permission 3 : Surveillance des entrees (Input Monitoring)
 
-Reglages systeme > Confidentialite et securite > Surveillance des entrees.
+Reglages systeme > Confidentialite et securite > **Surveillance des entrees**.
 
-Meme procedure : "+", choisir VoiceType, activer.
+Meme procedure : cadenas, mot de passe, **+**, choisir VoiceType, activer.
 
-### Relancer
+### Etape finale : quitte et relance
 
-Pour que les 3 permissions prennent effet, quitte VoiceType et relance le :
+Pour que les 3 permissions prennent effet, dans le Terminal :
 
 ```
 killall VoiceType
 open /Applications/VoiceType.app
 ```
 
-## Premier lancement
-
-A ce stade tu vois un petit dot (point) en haut a droite de l'ecran. Au tout premier lancement il reste **gris** : VoiceType telecharge le modele de transcription Whisper, environ 1.5 GB. Compte 5 a 15 minutes selon ta connexion.
-
-Quand le dot devient **vert**, c'est pret. Tu peux dicter.
+(`killall VoiceType` ferme proprement l'application, c'est normal malgre le mot.)
 
 ## Utiliser au quotidien
 
-Place ton curseur la ou tu veux le texte (Mail, Notes, navigateur, Slack, n'importe quelle app texte).
-
-Maintiens **Fn** (touche Globe en bas a gauche du clavier).
-Parle.
-Relache.
-
-Le texte apparait au bout de 0.6 a 1 seconde. Auto detect francais et anglais.
-
-### Etats du dot
+Tu vois un petit dot (point) en haut a droite de l'ecran. Etats :
 
 | Couleur | Signification |
 |---|---|
-| Gris | Chargement ou telechargement du modele |
-| Vert | Pret |
+| Gris | Chargement |
+| Vert | Pret, tu peux parler |
 | Rouge pulsant | Enregistrement en cours |
 | Orange | Transcription en cours |
 | Violet | Erreur (3 secondes puis retour vert) |
 
+Pour dicter :
+
+1. Place ton curseur la ou tu veux le texte (Mail, Notes, navigateur, Slack, ...).
+2. Maintiens la touche **Fn** (touche Globe en bas a gauche du clavier).
+3. Parle.
+4. Relache. Le texte apparait au bout de 0.6 a 1 seconde.
+
+Auto detect francais et anglais. Pas de configuration.
+
 ## Vocabulaire personnalise (optionnel)
 
-Si tu utilises souvent des noms propres ou termes que Whisper ne reconnait pas, ajoute les a un fichier de vocabulaire :
+Si tu utilises souvent des noms propres ou termes techniques que Whisper ne reconnait pas, ajoute les a un fichier de vocabulaire :
 
 ```
 mkdir -p ~/.voicetype
 nano ~/.voicetype/vocabulary.txt
 ```
 
-Tape un mot ou une phrase par ligne. Sauvegarde avec Ctrl+O, Entree, puis Ctrl+X.
+Tape un mot ou une phrase par ligne. Sauvegarde avec **Ctrl+O**, Entree, puis **Ctrl+X** pour quitter nano.
 
-Les ajouts sont pris en compte a la prochaine transcription, sans redemarrage.
-
-## Desinstaller
-
-```
-cd ~/Downloads/voicetype
-bash scripts/uninstall.sh
-```
-
-L'app, les modeles et les caches sont supprimes. Homebrew et ses paquets restent (ils peuvent te servir a d'autres outils).
-
-Pour retirer aussi les permissions : Reglages systeme > Confidentialite et securite > Microphone / Accessibilite / Surveillance des entrees, retirer VoiceType de chaque liste.
+Effet immediat a la prochaine transcription.
 
 ## Si ca plante
 
-Le plus simple : ouvre Claude Code dans le dossier du repo et explique lui ton probleme. Il a tout le contexte (fichier `CLAUDE.md`).
+### Le dot reste gris plus de 5 minutes apres avoir lance l'app
 
-Sinon, ping Clement directement.
+L'app charge le modele en memoire. Si le dot reste gris plus de 5 minutes, ouvre Claude Code (ou ping Clement) et envoie le contenu du log :
+
+```
+tail -50 ~/.voicetype/voicetype.log
+```
+
+### La touche Fn ne declenche rien (dot reste vert quand tu maintiens)
+
+La permission **Surveillance des entrees** n'est probablement pas active. Retourne dans Reglages systeme > Confidentialite et securite > Surveillance des entrees, verifie que VoiceType est dans la liste avec l'interrupteur sur on.
+
+Quitte et relance :
+
+```
+killall VoiceType ; open /Applications/VoiceType.app
+```
+
+### Le texte ne s'ecrit pas dans l'app cible
+
+La permission **Accessibilite** n'est probablement pas active. Meme procedure que ci-dessus dans la section Accessibilite.
+
+### Tout autre cas
+
+Le plus simple : ouvre Claude Code dans le dossier du repo et explique lui ton probleme. Il a tout le contexte (fichier `CLAUDE.md` du projet).
+
+Sinon, ping Clement directement avec une capture d'ecran et / ou le contenu du log :
+
+```
+tail -100 ~/.voicetype/voicetype.log
+```
 
 ## Mises a jour
 
@@ -160,4 +204,24 @@ git pull
 bash scripts/install.sh
 ```
 
-Les permissions macOS peuvent etre a redonner apres une mise a jour. Suis la procedure de la section "Autoriser les permissions".
+Apres une mise a jour, les permissions macOS peuvent etre a redonner. Procedure :
+
+1. Reglages systeme > Confidentialite et securite > Accessibilite : retire VoiceType (selectionne, bouton -).
+2. Idem pour Surveillance des entrees.
+3. Relance VoiceType (`killall VoiceType ; open /Applications/VoiceType.app`).
+4. Re-ajoute VoiceType dans les 2 listes via le bouton +.
+
+C'est une limitation de macOS quand l'application change de signature, pas un bug.
+
+## Desinstaller
+
+Une seule commande :
+
+```
+cd ~/Downloads/voicetype
+bash scripts/uninstall.sh
+```
+
+L'app, le modele et les caches sont supprimes. Homebrew et ses paquets restent (ils peuvent te servir a d'autres outils).
+
+Pour retirer aussi les permissions : Reglages systeme > Confidentialite et securite, et retire VoiceType de Microphone, Accessibilite, et Surveillance des entrees.
