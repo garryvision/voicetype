@@ -19,27 +19,31 @@ Stack technique :
 
 ## Mission de Claude Code
 
-Aider l'utilisateur a installer VoiceType sur son Mac et a le faire fonctionner. L'utilisateur peut etre non-tech : adopte un ton patient, explicatif, jamais condescendant. Verifie chaque etape avant de passer a la suivante.
+Aider l'utilisateur a installer VoiceType sur son Mac et a le faire fonctionner. L'utilisateur peut etre non-tech : adopte un ton patient, explicatif, jamais condescendant. Verifie chaque etape avant de passer a la suivante. Ne pretends jamais qu'une etape a reussi sans avoir vu la preuve dans le terminal ou dans le systeme.
 
 ## Procedure d'installation guidee
 
 Quand l'utilisateur dit "installe VoiceType" ou similaire, suis cette sequence.
 
-### Etape 1 : Verifier les prerequis
-
-Lance dans le terminal :
+### Etape 0 : Verifier les prerequis basiques
 
 ```bash
 sw_vers -productVersion && uname -m
 ```
 
 Conditions :
-- macOS 14.0 ou plus recent.
-- Apple Silicon (arm64) recommande. Intel toleré avec performances reduites.
+- macOS 14.0 ou plus recent. Si plus ancien, dis a l'utilisateur de mettre a jour macOS via Reglages systeme > General > Mise a jour de logiciels, et stoppe la.
+- Apple Silicon (arm64) recommande. Intel (x86_64) tolere mais avec performances reduites, demande confirmation a l'utilisateur avant de continuer.
 
-Si macOS trop ancien : explique a l'utilisateur qu'il doit mettre a jour via Reglages systeme > General > Mise a jour de logiciels. Stoppe la.
+Verifie que les outils Apple sont la :
 
-### Etape 2 : Lancer le script d'installation
+```bash
+xcode-select -p
+```
+
+Si echec ("error: unable to get active developer directory"), explique a l'utilisateur qu'il doit d'abord lancer `xcode-select --install`, accepter la fenetre Apple, attendre 5 a 15 minutes que ca se termine, puis revenir te voir. C'est bloquant pour la suite.
+
+### Etape 1 : Lancer le script d'installation
 
 ```bash
 ./scripts/install.sh
@@ -47,80 +51,102 @@ Si macOS trop ancien : explique a l'utilisateur qu'il doit mettre a jour via Reg
 
 Le script va :
 1. Verifier macOS et l'architecture.
-2. Installer Xcode Command Line Tools si absent (boite de dialogue Apple, l'utilisateur doit cliquer "Installer" puis attendre puis relancer le script).
+2. Verifier les Xcode Command Line Tools (deja installes a l'etape 0).
 3. Installer Homebrew si absent (demande le mot de passe Mac).
 4. Installer whisper-cpp et ffmpeg via Homebrew.
-5. Compiler VoiceType.
-6. Copier l'app dans /Applications.
+5. Telecharger le modele Whisper (1.5 GB) via curl avec reprise automatique en cas d'echec reseau. La barre de progression s'affiche dans le terminal.
+6. Compiler VoiceType.
+7. Copier l'app dans /Applications.
 
 Si le script echoue, lis le message d'erreur et propose une remediation precise. Ne devine pas.
+
+Si l'utilisateur a une connexion lente ou instable (cas frequent au Vietnam) et que le telechargement du modele echoue : relance simplement `bash scripts/install.sh`. Le script reprend ou il s'est arrete grace a `curl -C -`.
+
+### Etape 2 : Premier lancement et Gatekeeper
+
+```bash
+open /Applications/VoiceType.app
+```
+
+Sur macOS 15 (Sequoia) et plus recent, Gatekeeper peut bloquer la premiere ouverture avec le message "VoiceType cannot be opened because the developer cannot be verified" (la signature est ad-hoc locale, pas Apple Developer).
+
+Procedure de bypass (l'utilisateur clique, tu ne peux pas le faire pour lui) :
+
+1. Va dans Reglages systeme > Confidentialite et securite.
+2. Descend tout en bas, tu verras un message sur VoiceType avec un bouton "Ouvrir quand meme".
+3. Clique. Confirme avec le mot de passe Mac.
+
+Apres ce bypass, l'app s'ouvre normalement et ne sera plus bloquee.
 
 ### Etape 3 : Permissions macOS (manuelles, l'utilisateur clique)
 
 Tu ne peux pas cliquer dans les Reglages systeme a la place de l'utilisateur. Guide-le verbalement, etape par etape. Trois permissions sont necessaires :
 
-1. **Microphone** : prompt automatique au premier lancement. L'utilisateur clique "Autoriser".
+1. **Microphone** : prompt automatique au premier enregistrement. L'utilisateur clique "Autoriser".
 
 2. **Accessibilite** : Reglages systeme > Confidentialite et securite > Accessibilite. Cliquer le cadenas en bas, taper le mot de passe Mac. Cliquer le bouton "+", choisir VoiceType dans /Applications, valider, activer l'interrupteur.
 
 3. **Surveillance des entrees** (Input Monitoring) : meme procedure dans Reglages systeme > Confidentialite et securite > Surveillance des entrees.
 
-Apres avoir donne les 3 permissions, l'utilisateur doit quitter VoiceType (`killall VoiceType` dans le terminal, ou clic droit sur le dot) puis relancer (`open /Applications/VoiceType.app`). Les permissions prennent effet au lancement suivant.
-
-### Etape 4 : Premier lancement et telechargement du modele
-
-Au tout premier lancement, VoiceType telecharge le modele Whisper (1.5 GB, large-v3-turbo) dans `~/.voicetype/models/`. Cela prend 5 a 15 minutes selon la connexion.
-
-Pendant le telechargement, le dot (petit point en haut a droite de l'ecran) reste gris. Quand il devient vert, l'app est prete.
-
-Pour verifier la progression :
+Apres avoir donne les 3 permissions, l'utilisateur doit quitter VoiceType et relancer pour qu'elles prennent effet :
 
 ```bash
-ls -lah ~/.voicetype/models/ 2> /dev/null
+killall VoiceType ; open /Applications/VoiceType.app
 ```
 
-Si le fichier `ggml-large-v3-turbo.bin` apparait et grossit, c'est en cours. S'il y a 0 fichier au bout de 2 minutes, voir Troubleshooting plus bas.
+### Etape 4 : Verifier que ca marche
 
-### Etape 5 : Utilisation
+Le modele est deja telecharge (par le script d'install), donc le dot devrait passer rapidement de gris a vert au lancement. Si le dot reste gris plus de 30 secondes :
 
-L'utilisateur place son curseur dans une app texte (Notes, Mail, navigateur, ...), maintient la touche Fn (Globe, en bas a gauche du clavier), parle, relache. Le texte arrive 0.6 a 1 seconde apres avoir relache.
+```bash
+ls -lah ~/.voicetype/models/
+tail -50 ~/.voicetype/voicetype.log
+```
 
-Etats du dot :
-- Gris : chargement ou telechargement modele.
-- Vert : pret.
-- Rouge pulsant : enregistrement en cours.
-- Orange : transcription en cours.
-- Violet : erreur (3 secondes puis retour vert).
+Demande a l'utilisateur de tester :
+
+1. Ouvrir l'app Notes.
+2. Cliquer dans le corps de la note.
+3. Maintenir la touche Fn (Globe, en bas a gauche), dire "test un deux trois" en francais, relacher.
+4. Le texte doit apparaitre dans Notes au bout de 0.6 a 1 seconde.
+
+Si le dot ne passe pas en rouge quand l'utilisateur maintient Fn : permission Surveillance des entrees non active.
+
+Si le dot passe en rouge mais le texte n'arrive pas : permission Accessibilite non active.
+
+## Etats du dot
+
+| Couleur | Signification |
+|---|---|
+| Gris | Chargement |
+| Vert | Pret |
+| Rouge pulsant | Enregistrement en cours |
+| Orange | Transcription en cours |
+| Violet | Erreur (3 secondes puis retour vert) |
 
 ## Troubleshooting
 
 ### Le dot ne s'affiche pas apres install
 
-L'app ne tourne probablement pas. Verifier :
+L'app ne tourne probablement pas. Verifie :
 
 ```bash
-ps aux | grep VoiceType | grep -v grep
+pgrep -x VoiceType
 ```
 
-Si rien : lance `open /Applications/VoiceType.app`.
-
-Si l'app tourne mais pas de dot visible : c'est rare. Regarde les logs :
-
-```bash
-tail -50 ~/.voicetype/voicetype.log
-```
+Si rien, lance `open /Applications/VoiceType.app`. Si l'app refuse de se lancer, voir Etape 2 (Gatekeeper).
 
 ### La touche Fn ne declenche rien
 
-Permission "Surveillance des entrees" probablement manquante. Demande a l'utilisateur d'aller dans Reglages systeme > Confidentialite et securite > Surveillance des entrees, et de verifier que VoiceType est dans la liste et active.
+Permission Surveillance des entrees probablement manquante. Demande a l'utilisateur d'aller dans Reglages systeme > Confidentialite et securite > Surveillance des entrees, et de verifier que VoiceType est dans la liste et active.
 
 Apres modification : `killall VoiceType ; open /Applications/VoiceType.app`.
 
 ### Le texte n'est pas colle dans l'app cible
 
-Permission "Accessibilite" probablement manquante. Meme procedure que ci-dessus dans la section Accessibilite.
+Permission Accessibilite probablement manquante. Meme procedure que ci-dessus.
 
-Si le probleme persiste dans une app specifique (Electron, Slack, navigateur), cela peut venir d'un delai de paste trop court. C'est documenté comme limitation.
+Si le probleme persiste dans une app specifique (Electron, Slack desktop, certains navigateurs), c'est un probleme de timing du paste. C'est une limitation connue.
 
 ### L'app crash au lancement
 
@@ -136,7 +162,7 @@ Et les logs de l'app :
 tail -50 ~/.voicetype/voicetype.log
 ```
 
-Cause frequente : whisper-cli ou ffmpeg manquants. Verifie :
+Cause frequente : `whisper-cli` ou `ffmpeg` manquants apres une desinstallation accidentelle de Homebrew. Verifie :
 
 ```bash
 which whisper-cli ffmpeg
@@ -144,34 +170,35 @@ which whisper-cli ffmpeg
 
 Si l'un manque : `brew install whisper-cpp ffmpeg`.
 
-### Le modele ne se telecharge pas
+### Le modele n'est pas la
 
-Si le dot reste gris plus de 15 minutes :
+Si `~/.voicetype/models/ggml-large-v3-turbo.bin` n'existe pas ou fait moins de 1.5 GB :
 
 ```bash
-ls -lah ~/.voicetype/models/
+bash scripts/install.sh
 ```
 
-S'il n'y a pas de fichier `.bin` qui grossit : connexion internet ? espace disque ?
+Le script reprend le telechargement la ou il s'est arrete grace a `curl -C -`. Pas besoin de tout refaire.
 
-Telechargement manuel possible :
+Telechargement manuel direct possible aussi :
 
 ```bash
 mkdir -p ~/.voicetype/models
-curl -L --progress-bar -o ~/.voicetype/models/ggml-large-v3-turbo.bin \
+curl -L --retry 5 -C - --progress-bar \
+  -o ~/.voicetype/models/ggml-large-v3-turbo.bin \
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
 ```
 
-Puis relance VoiceType.
-
 ### Permissions perdues apres une mise a jour
 
-Si l'utilisateur a fait `git pull` puis `./scripts/install.sh`, les permissions TCC peuvent etre revoquees par macOS car la signature de l'app a change. Procedure de recuperation :
+Si l'utilisateur a fait `git pull` puis `bash scripts/install.sh`, les permissions TCC peuvent etre revoquees par macOS car la signature ad-hoc de l'app a change. Procedure de recuperation :
 
-1. Reglages systeme > Confidentialite et securite > Accessibilite : retirer VoiceType (bouton -).
+1. Reglages systeme > Confidentialite et securite > Accessibilite : selectionner VoiceType, cliquer "-" pour le retirer.
 2. Idem pour Surveillance des entrees.
 3. Relancer VoiceType : `open /Applications/VoiceType.app`.
-4. Re-ajouter VoiceType dans les 2 listes via le bouton +.
+4. Re-ajouter VoiceType dans les 2 listes via le bouton "+".
+
+C'est une limitation de macOS, pas un bug. Apple Developer ID a 99 dollars par an stabiliserait ca, mais Clement n'a pas pris cet abonnement.
 
 ## Vocabulaire personnalise (optionnel)
 
@@ -187,12 +214,12 @@ Effet immediat a la prochaine transcription, pas besoin de redemarrer l'app.
 
 ## Posture et limites
 
-- Ne tente jamais de cliquer dans les Reglages systeme a la place de l'utilisateur. Donne les instructions verbales claires.
-- Ne lance pas `sudo` sans expliquer ce que ca fait et pourquoi.
-- Si une etape echoue, montre l'erreur exacte et propose une remediation. Ne devine pas.
-- L'utilisateur n'est pas developpeur : evite le jargon, preferer "le petit point a droite de l'ecran" plutot que "le NSWindow flottant".
-- Pour tout bug non couvert ici, suggere a l'utilisateur d'ouvrir une issue sur https://github.com/garryvision/voicetype/issues ou de contacter Clement directement.
+- Ne tente jamais de cliquer dans les Reglages systeme a la place de l'utilisateur. Donne les instructions verbales claires, eventuellement avec le chemin exact des panneaux.
+- Ne lance pas `sudo` sans expliquer ce que ca fait et pourquoi. Le script d'install ne demande sudo qu'une seule fois (pour Homebrew).
+- Si une etape echoue, montre l'erreur exacte et propose une remediation. Ne devine pas, ne suppose pas que "ca devrait marcher quand meme".
+- L'utilisateur n'est pas developpeur : evite le jargon. Prefere "le petit point en haut a droite de l'ecran" plutot que "le NSWindow flottant".
+- Pour tout bug non couvert ici, suggere a l'utilisateur d'ouvrir une issue sur https://github.com/garryvision/voicetype/issues ou de contacter Clement directement avec une capture d'ecran et le contenu du log `~/.voicetype/voicetype.log`.
 
 ## Pour aller plus loin
 
-Source du projet et historique de developpement : voir le repo GitHub. L'app est volontairement minimaliste (~750 lignes Swift). Toutes les ameliorations sont les bienvenues.
+Le code source est dans `Sources/VoiceType/`. L'app est volontairement minimaliste (~750 lignes Swift). Tout est documente dans le code.
