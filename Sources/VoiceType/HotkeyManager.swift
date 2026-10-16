@@ -3,14 +3,17 @@ import Quartz
 final class HotkeyManager {
     private let onPress: () -> Void
     private let onRelease: () -> Void
+    private let onCancel: () -> Void
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var fnIsDown = false
     private var retainedSelf: Unmanaged<HotkeyManager>?
 
-    init(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) {
+    init(onPress: @escaping () -> Void, onRelease: @escaping () -> Void,
+         onCancel: @escaping () -> Void) {
         self.onPress = onPress
         self.onRelease = onRelease
+        self.onCancel = onCancel
     }
 
     deinit {
@@ -34,7 +37,7 @@ final class HotkeyManager {
             callback: HotkeyManager.eventCallback,
             userInfo: retained.toOpaque()
         ) else {
-            NSLog("VoiceType: Failed to create event tap — grant Accessibility permission")
+            Log.write("Failed to create event tap — grant Accessibility and Input Monitoring")
             retained.release()
             retainedSelf = nil
             return
@@ -76,18 +79,18 @@ final class HotkeyManager {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
-                NSLog("VoiceType: Event tap re-enabled after timeout")
+                Log.write("Event tap re-enabled after timeout")
             }
             // Check actual Fn state — events were missed while tap was disabled
             let actualFlags = NSEvent.modifierFlags
             let fnActuallyDown = actualFlags.contains(.function)
             if fnIsDown && !fnActuallyDown {
                 fnIsDown = false
-                NSLog("VoiceType: Forcing Fn release — key was released during tap disable")
+                Log.write("Forcing Fn release — key was released during tap disable")
                 DispatchQueue.main.async { self.onRelease() }
             } else if !fnIsDown && fnActuallyDown {
                 fnIsDown = true
-                NSLog("VoiceType: Forcing Fn press — key was pressed during tap disable")
+                Log.write("Forcing Fn press — key was pressed during tap disable")
                 DispatchQueue.main.async { self.onPress() }
             }
             return
@@ -107,7 +110,12 @@ final class HotkeyManager {
                 fnIsDown = false
                 DispatchQueue.main.async { self.onRelease() }
             }
-        } else if keycode == 63 {
+        } else if keycode != 63 {
+            // Fn + another key (arrows, delete, F-keys) is a shortcut, not a dictation
+            if type == .keyDown && fnIsDown {
+                DispatchQueue.main.async { self.onCancel() }
+            }
+        } else {
             if type == .keyDown && !fnIsDown {
                 fnIsDown = true
                 DispatchQueue.main.async { self.onPress() }

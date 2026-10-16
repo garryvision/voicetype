@@ -3,25 +3,31 @@ import Foundation
 final class Transcriber {
     private let modelDir: URL
     private let modelName = "ggml-large-v3-turbo.bin"
+    private let vadModelName = "ggml-silero-v5.1.2.bin"
+    private var vadModelPath: URL?
     private var whisperBinary: String?
     private var modelPath: URL?
     private var isReady = false
 
+    /// Shorter captures are accidental taps, not dictations.
+    static let minDuration: TimeInterval = 0.8
+    /// Last capture, kept to diagnose a failed dictation (overwritten each time).
+    static let lastRecordingURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".voicetype/last-recording.wav")
+    static let vocabularyURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".voicetype/vocabulary.txt")
+
     private let transcriptionTimeout: TimeInterval = 60  // 60s max for whisper-cli
     var translate = false  // --translate: output in English regardless of input language
-
-    // Filter out whisper hallucinations on silence/short audio
-    private let junkPatterns: Set<String> = [
-        "[BLANK_AUDIO]", "(crickets chirping)", "you", "Thank you.",
-        "Thanks for watching!", "Sous-titres réalisés",
-    ]
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         modelDir = home.appendingPathComponent(".voicetype/models")
     }
 
-    func loadModel() {
+    /// Locates whisper-cli and the models, downloading missing ones. Returns readiness.
+    @discardableResult
+    func loadModel() -> Bool {
         let candidates = [
             "/opt/homebrew/bin/whisper-cli",
             "/usr/local/bin/whisper-cli",
@@ -29,23 +35,30 @@ final class Transcriber {
         whisperBinary = candidates.first { FileManager.default.fileExists(atPath: $0) }
 
         guard whisperBinary != nil else {
-            NSLog("VoiceType: whisper-cli not found. Install: brew install whisper-cpp")
-            return
+            Log.write("whisper-cli not found. Install: brew install whisper-cpp")
+            return false
         }
 
         try? FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
         let model = modelDir.appendingPathComponent(modelName)
         if !FileManager.default.fileExists(atPath: model.path) {
-            NSLog("VoiceType: Downloading whisper base model...")
-            downloadModel(to: model)
+            Log.write("Downloading \(modelName)...")
+            download(repo: "ggerganov/whisper.cpp", file: modelName, to: model)
         }
+
+        let vad = modelDir.appendingPathComponent(vadModelName)
+        if !FileManager.default.fileExists(atPath: vad.path) {
+            download(repo: "ggml-org/whisper-vad", file: vadModelName, to: vad)
+        }
+        vadModelPath = FileManager.default.fileExists(atPath: vad.path) ? vad : nil
 
         if FileManager.default.fileExists(atPath: model.path) {
             modelPath = model
             isReady = true
-            NSLog("VoiceType: Ready")
+            Log.write("Ready (language: \(Settings.language), VAD: \(vadModelPath != nil && Settings.vadEnabled))")
         }
+        return isReady
     }
 
     /// Returns transcribed text, or nil on error (timeout, crash, etc.)
@@ -55,28 +68,44 @@ final class Transcriber {
         }
 
         let duration = Double(samples.count) / 16000.0
-        if duration < 0.8 {
-            NSLog("VoiceType: Audio too short (%.1fs) — skipping", duration)
+        if duration < Self.minDuration {
             return .empty
         }
 
-        NSLog("VoiceType: Transcribing %.1fs audio...", duration)
-
-        let tempWav = FileManager.default.temporaryDirectory
-            .appendingPathComponent("vt_\(UUID().uuidString).wav")
-        defer { try? FileManager.default.removeItem(at: tempWav) }
-
-        guard writeWAV(samples: samples, sampleRate: 16000, to: tempWav) else {
-            return .error("Failed to write temp WAV")
+        let wav = Self.lastRecordingURL
+        guard writeWAV(samples: samples, sampleRate: 16000, to: wav) else {
+            return .error("Failed to write WAV")
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: binary)
+        let useVAD = Settings.vadEnabled && vadModelPath != nil
+        let result = transcribe(wav: wav, binary: binary, model: model, vad: useVAD)
+        // VAD can reject quiet speech (whispering, noisy train): never let it cost a dictation
+        if useVAD, case .empty = result {
+            Log.write("Empty with VAD — retrying without")
+            return transcribe(wav: wav, binary: binary, model: model, vad: false)
+        }
+        return result
+    }
+
+    private func transcribe(wav: URL, binary: String, model: URL, vad: Bool) -> TranscriptionResult {
+        switch run(binary: binary, arguments: arguments(model: model, wav: wav, vad: vad)) {
+        case .failure(let reason):
+            return .error(reason)
+        case .success(let raw):
+            let text = TranscriptCleaner.clean(raw)
+            if text != raw.trimmingCharacters(in: .whitespacesAndNewlines) {
+                Log.write("Cleaned hallucination from: '\(raw)'")
+            }
+            return text.isEmpty ? .empty : .success(text)
+        }
+    }
+
+    private func arguments(model: URL, wav: URL, vad: Bool) -> [String] {
         var args = [
             "-m", model.path,
-            "-f", tempWav.path,
+            "-f", wav.path,
             "--no-timestamps",
-            "--language", "auto",
+            "--language", Settings.language,
             "--threads", "6",
             "--beam-size", "1",
             "--best-of", "1",
@@ -84,65 +113,53 @@ final class Transcriber {
             "--no-prints",
         ]
 
-        // Custom vocabulary via --prompt (biases whisper toward these words)
+        if vad, let vadModel = vadModelPath {
+            args += ["--vad", "--vad-model", vadModel.path]
+        }
+
+        // Custom vocabulary via --prompt, carried to every 30 s window (not only the first)
         let vocab = loadVocabulary()
         if !vocab.isEmpty {
-            args += ["--prompt", vocab]
+            args += ["--prompt", vocab, "--carry-initial-prompt"]
         }
 
         if translate {
             args.append("--translate")
         }
+        return args
+    }
 
-        process.arguments = args
+    private enum RunOutcome { case success(String), failure(String) }
+
+    private func run(binary: String, arguments: [String]) -> RunOutcome {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binary)
+        process.arguments = arguments
 
         let stdoutPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.nullDevice  // Prevent pipe deadlock
 
-        var outputData = Data()
-
         do {
             try process.run()
-
-            // Read stdout before waiting (prevents pipe buffer deadlock)
-            outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-
-            // Wait with timeout
-            let exited = waitForExit(process, timeout: transcriptionTimeout)
-            if !exited {
-                NSLog("VoiceType: whisper-cli timeout after %.0fs — killing", transcriptionTimeout)
-                process.terminate()
-                DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                }
-                return .error("Transcription timeout")
-            }
-
-            if process.terminationStatus != 0 {
-                NSLog("VoiceType: whisper-cli exited with status %d", process.terminationStatus)
-                return .error("whisper-cli exit \(process.terminationStatus)")
-            }
         } catch {
-            NSLog("VoiceType: whisper-cli failed: %@", error.localizedDescription)
-            return .error(error.localizedDescription)
+            return .failure("whisper-cli failed: \(error.localizedDescription)")
         }
 
-        let raw = String(data: outputData, encoding: .utf8) ?? ""
-        let result = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Read stdout before waiting (prevents pipe buffer deadlock)
+        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
 
-        // Filter junk (case-insensitive, trimmed)
-        let normalized = result.trimmingCharacters(in: .punctuationCharacters).lowercased()
-        for pattern in junkPatterns {
-            if normalized == pattern.lowercased()
-                || result.lowercased().hasPrefix(pattern.lowercased()) {
-                NSLog("VoiceType: Filtered junk: '%@'", result)
-                return .empty
+        guard waitForExit(process, timeout: transcriptionTimeout) else {
+            process.terminate()
+            DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             }
+            return .failure("Transcription timeout")
         }
-
-        NSLog("VoiceType: Transcribed: '%@'", result)
-        return result.isEmpty ? .empty : .success(result)
+        guard process.terminationStatus == 0 else {
+            return .failure("whisper-cli exit \(process.terminationStatus)")
+        }
+        return .success(String(data: outputData, encoding: .utf8) ?? "")
     }
 
     // MARK: - Result type
@@ -168,18 +185,12 @@ final class Transcriber {
     /// Load custom vocabulary from ~/.voicetype/vocabulary.txt
     /// Each line is a word/phrase that biases whisper recognition
     private func loadVocabulary() -> String {
-        let vocabFile = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".voicetype/vocabulary.txt")
-        guard let content = try? String(contentsOf: vocabFile, encoding: .utf8) else { return "" }
+        guard let content = try? String(contentsOf: Self.vocabularyURL, encoding: .utf8) else { return "" }
         // Join lines into a single prompt string
         let words = content.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
-        let prompt = words.joined(separator: ", ")
-        if !prompt.isEmpty {
-            NSLog("VoiceType: Vocabulary loaded (%d terms)", words.count)
-        }
-        return prompt
+        return words.joined(separator: ", ")
     }
 
     // MARK: - Process timeout
@@ -195,17 +206,17 @@ final class Transcriber {
 
     // MARK: - Model download
 
-    private func downloadModel(to destination: URL) {
-        let urlString = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(modelName)"
+    private func download(repo: String, file: String, to destination: URL) {
+        let urlString = "https://huggingface.co/\(repo)/resolve/main/\(file)"
         guard let url = URL(string: urlString) else { return }
 
         let semaphore = DispatchSemaphore(value: 0)
         let task = URLSession.shared.downloadTask(with: url) { tempURL, _, error in
             defer { semaphore.signal() }
-            if let error { NSLog("VoiceType: Download failed: \(error)"); return }
+            if let error { Log.write("Download failed (\(file)): \(error.localizedDescription)"); return }
             guard let tempURL else { return }
             try? FileManager.default.moveItem(at: tempURL, to: destination)
-            NSLog("VoiceType: Model downloaded")
+            Log.write("Downloaded \(file)")
         }
         task.resume()
         semaphore.wait()
@@ -233,16 +244,14 @@ final class Transcriber {
         data.append(contentsOf: "data".utf8)
         data.append(contentsOf: withUnsafeBytes(of: UInt32(dataSize).littleEndian) { Array($0) })
 
-        for sample in samples {
-            let int16 = Int16(max(-1.0, min(1.0, sample)) * 32767.0)
-            data.append(contentsOf: withUnsafeBytes(of: int16.littleEndian) { Array($0) })
-        }
+        let pcm = samples.map { Int16(max(-1.0, min(1.0, $0)) * 32767.0).littleEndian }
+        pcm.withUnsafeBytes { data.append(contentsOf: $0) }
 
         do {
             try data.write(to: url)
             return true
         } catch {
-            NSLog("VoiceType: Failed to write WAV: %@", error.localizedDescription)
+            Log.write("Failed to write WAV: \(error.localizedDescription)")
             return false
         }
     }
