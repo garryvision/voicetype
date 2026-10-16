@@ -1,7 +1,11 @@
 # VoiceType : Swift macOS voice-to-text
 APP_NAME := VoiceType
 BUNDLE := dist/$(APP_NAME).app
-SIGN_IDENTITY ?= -
+# Clément's stable certificate when present (keeps macOS permissions across builds),
+# ad-hoc signature otherwise (friends' Macs)
+SIGN_IDENTITY ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -q '"VoiceType Signing"' && echo "VoiceType Signing" || echo -)
+VERSION := 0.3.0
+PLIST := $(BUNDLE)/Contents/Info.plist
 SWIFT_FILES := Sources/VoiceType/*.swift
 FRAMEWORKS := -framework AppKit -framework AVFoundation -framework Quartz \
               -framework Accelerate -framework ApplicationServices
@@ -26,17 +30,20 @@ build:
 			-c "Add :NSHighResolutionCapable bool true" \
 			$(BUNDLE)/Contents/Info.plist ; \
 	fi
+	@/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(VERSION)" \
+		-c "Set :CFBundleShortVersionString $(VERSION)" $(PLIST)
 	@codesign --force --sign "$(SIGN_IDENTITY)" $(BUNDLE)
 	@xattr -cr $(BUNDLE)
 	@echo "Built and signed with $(SIGN_IDENTITY)"
 
-## Install : copy to /Applications
+## Install : overwrite the files inside the existing bundle. Never delete it and never
+## cp -R onto it (the copy lands inside). Same certificate = permissions kept.
 install: build
 	@killall $(APP_NAME) 2>/dev/null || true
 	@sleep 1
-	@rm -rf /Applications/$(APP_NAME).app
-	@cp -R $(BUNDLE) /Applications/
-	@echo "Installed. Run: make run"
+	@ditto $(BUNDLE) /Applications/$(APP_NAME).app
+	@codesign --verify --strict /Applications/$(APP_NAME).app
+	@echo "Installed $(VERSION). Run: make run"
 
 ## Run
 run:
