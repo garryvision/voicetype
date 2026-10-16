@@ -77,7 +77,7 @@ Le script va :
 1. Verifier ton Mac et ton macOS.
 2. Verifier les outils Apple (deja installes a l'etape "Avant de commencer").
 3. Installer Homebrew si tu ne l'as pas. Ton mot de passe Mac sera demande.
-4. Installer les outils dont VoiceType a besoin : `whisper-cpp` pour la transcription, `ffmpeg` pour le micro.
+4. Installer les outils dont VoiceType a besoin : `whisper-cpp` pour la transcription, `ffmpeg` en secours pour le micro.
 5. Telecharger le modele de transcription (1.5 GB). Une barre de progression s'affiche. Si la connexion coupe, relance la commande `bash scripts/install.sh`, le telechargement reprendra ou il s'est arrete.
 6. Compiler VoiceType et l'installer dans Applications.
 
@@ -128,24 +128,27 @@ open /Applications/VoiceType.app
 
 ## Utiliser au quotidien
 
-Tu vois un petit dot (point) en haut a droite de l'ecran. Etats :
+Une petite capsule apparait en bas au centre de l'ecran, au-dessus du Dock. Etats :
 
-| Couleur | Signification |
+| Ce que tu vois | Signification |
 |---|---|
-| Gris | Chargement |
-| Vert | Pret, tu peux parler |
-| Rouge pulsant | Enregistrement en cours |
-| Orange | Transcription en cours |
-| Violet | Erreur (3 secondes puis retour vert) |
+| Petit trait gris discret | Pret, tu peux parler |
+| Capsule noire avec point rouge et barres qui bougent | Enregistrement : les barres suivent ta voix, si elles restent plates le micro ne t'entend pas |
+| Capsule noire avec barres en vague | Transcription en cours |
+| Capsule avec un message (ex : "Micro indisponible") | Erreur, explique en clair pendant 2 secondes |
+
+Clique sur la capsule pour ouvrir le menu : copier la derniere dictee, pause, langue, vocabulaire, journal, quitter.
 
 Pour dicter :
 
 1. Place ton curseur la ou tu veux le texte (Mail, Notes, navigateur, Slack, ...).
 2. Maintiens la touche **Fn** (touche Globe en bas a gauche du clavier).
 3. Parle.
-4. Relache. Le texte apparait au bout de 0.6 a 1 seconde.
+4. Relache. Le texte apparait au bout de 1 a 2 secondes.
 
-Auto detect francais et anglais. Pas de configuration.
+Astuce : Fn + une autre touche (fleches, suppr) n'enregistre rien, c'est un raccourci.
+
+Francais par defaut. Pour l'anglais ou un melange de langues : menu de la capsule > "Detecter la langue automatiquement".
 
 ## Vocabulaire personnalise (optionnel)
 
@@ -162,15 +165,15 @@ Effet immediat a la prochaine transcription.
 
 ## Si ca plante
 
-### Le dot reste gris plus de 5 minutes apres avoir lance l'app
+### La capsule affiche "Whisper introuvable" ou rien ne se transcrit
 
-L'app charge le modele en memoire. Si le dot reste gris plus de 5 minutes, ouvre Claude Code (ou ping Clement) et envoie le contenu du log :
+Si le probleme persiste apres une relance, ouvre Claude Code (ou ping Clement) et envoie le contenu du log :
 
 ```
 tail -50 ~/.voicetype/voicetype.log
 ```
 
-### La touche Fn ne declenche rien (dot reste vert quand tu maintiens)
+### La touche Fn ne declenche rien (la capsule ne s'agrandit pas quand tu maintiens)
 
 La permission **Surveillance des entrees** n'est probablement pas active. Retourne dans Reglages systeme > Confidentialite et securite > Surveillance des entrees, verifie que VoiceType est dans la liste avec l'interrupteur sur on.
 

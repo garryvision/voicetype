@@ -13,7 +13,8 @@ L'app a ete cree par Clement Lameley. Elle est partagee a un cercle restreint d'
 Stack technique :
 - Swift natif (Sources/VoiceType/)
 - whisper-cli via Homebrew pour la transcription
-- ffmpeg via Homebrew pour la capture micro
+- AVAudioEngine pour la capture micro (ffmpeg via Homebrew en secours automatique)
+- VAD Silero (modele de 885 KB telecharge par l'app au lancement) pour ignorer les silences
 - CGEvent tap pour la touche Fn
 - NSPasteboard plus Cmd+V pour l'injection texte
 
@@ -96,7 +97,7 @@ killall VoiceType ; open /Applications/VoiceType.app
 
 ### Etape 4 : Verifier que ca marche
 
-Le modele est deja telecharge (par le script d'install), donc le dot devrait passer rapidement de gris a vert au lancement. Si le dot reste gris plus de 30 secondes :
+Le modele est deja telecharge (par le script d'install). Au lancement, un petit trait gris apparait en bas au centre de l'ecran. Si la capsule affiche "Whisper introuvable" :
 
 ```bash
 ls -lah ~/.voicetype/models/
@@ -108,25 +109,31 @@ Demande a l'utilisateur de tester :
 1. Ouvrir l'app Notes.
 2. Cliquer dans le corps de la note.
 3. Maintenir la touche Fn (Globe, en bas a gauche), dire "test un deux trois" en francais, relacher.
-4. Le texte doit apparaitre dans Notes au bout de 0.6 a 1 seconde.
+4. Le texte doit apparaitre dans Notes au bout de 1 a 2 secondes.
 
-Si le dot ne passe pas en rouge quand l'utilisateur maintient Fn : permission Surveillance des entrees non active.
+Si la capsule ne s'agrandit pas quand l'utilisateur maintient Fn : permission Surveillance des entrees non active.
 
-Si le dot passe en rouge mais le texte n'arrive pas : permission Accessibilite non active.
+Si la capsule s'agrandit mais que les barres restent plates : permission Micro non active, ou mauvais micro selectionne dans Reglages systeme > Son > Entree.
 
-## Etats du dot
+Si les barres bougent mais que le texte n'arrive pas : permission Accessibilite non active. Le dernier enregistrement est dans `~/.voicetype/last-recording.wav` pour diagnostiquer.
 
-| Couleur | Signification |
+## Etats de la capsule (en bas au centre de l'ecran)
+
+| Ce que l'utilisateur voit | Signification |
 |---|---|
-| Gris | Chargement |
-| Vert | Pret |
-| Rouge pulsant | Enregistrement en cours |
-| Orange | Transcription en cours |
-| Violet | Erreur (3 secondes puis retour vert) |
+| Petit trait gris | Pret |
+| Contour gris vide | En pause (menu de la capsule) |
+| Capsule noire, point rouge, barres qui bougent | Enregistrement, les barres suivent le niveau du micro |
+| Capsule noire, barres en vague | Transcription |
+| Capsule avec message | Erreur ou info en clair pendant 2 secondes |
+
+Clic sur la capsule : menu (copier la derniere dictee, pause, langue, vocabulaire, journal, quitter).
+
+Reglages sans recompiler : `defaults write com.clement.voicetype language auto` (ou `fr`, defaut), `audioBackend ffmpeg`, `vad -bool false`.
 
 ## Troubleshooting
 
-### Le dot ne s'affiche pas apres install
+### La capsule ne s'affiche pas apres install
 
 L'app ne tourne probablement pas. Verifie :
 
@@ -217,7 +224,7 @@ Effet immediat a la prochaine transcription, pas besoin de redemarrer l'app.
 - Ne tente jamais de cliquer dans les Reglages systeme a la place de l'utilisateur. Donne les instructions verbales claires, eventuellement avec le chemin exact des panneaux.
 - Ne lance pas `sudo` sans expliquer ce que ca fait et pourquoi. Le script d'install ne demande sudo qu'une seule fois (pour Homebrew).
 - Si une etape echoue, montre l'erreur exacte et propose une remediation. Ne devine pas, ne suppose pas que "ca devrait marcher quand meme".
-- L'utilisateur n'est pas developpeur : evite le jargon. Prefere "le petit point en haut a droite de l'ecran" plutot que "le NSWindow flottant".
+- L'utilisateur n'est pas developpeur : evite le jargon. Prefere "la petite capsule en bas au centre de l'ecran" plutot que "le NSPanel flottant".
 - Pour tout bug non couvert ici, suggere a l'utilisateur d'ouvrir une issue sur https://github.com/garryvision/voicetype/issues ou de contacter Clement directement avec une capture d'ecran et le contenu du log `~/.voicetype/voicetype.log`.
 
 ## Pour aller plus loin
