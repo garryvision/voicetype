@@ -207,14 +207,26 @@ git pull
 bash scripts/install.sh
 ```
 
-Apres une mise a jour, les permissions macOS peuvent etre a redonner. Procedure :
+Apres chaque mise a jour, les permissions macOS sont a redonner (les interrupteurs restent allumes mais ne marchent plus). Procedure :
 
 1. Reglages systeme > Confidentialite et securite > Accessibilite : retire VoiceType (selectionne, bouton -).
 2. Idem pour Surveillance des entrees.
-3. Relance VoiceType (`killall VoiceType ; open /Applications/VoiceType.app`).
-4. Re-ajoute VoiceType dans les 2 listes via le bouton +.
+3. Relance VoiceType (`killall VoiceType ; open /Applications/VoiceType.app`). Si macOS redemande le micro, clique Autoriser.
+4. Re-ajoute VoiceType dans les 2 listes via le bouton +, puis relance une derniere fois.
 
 C'est une limitation de macOS quand l'application change de signature, pas un bug.
+
+### Revenir a la version precedente
+
+Si une mise a jour pose probleme, reviens a la 0.2.0 :
+
+```
+cd ~/Downloads/voicetype
+git checkout v0.2.0
+bash scripts/install.sh
+```
+
+Pour revenir ensuite a la derniere version : `git checkout main && git pull && bash scripts/install.sh`.
 
 ## Desinstaller
 
