@@ -10,7 +10,7 @@ Tu ne peux rien casser. Si tu bloques quelque part, ping Clement avec une captur
 
 - Mac sous macOS 14 (Sonoma) ou plus recent. Verifie : Menu Pomme > A propos de ce Mac.
 - Apple Silicon recommande (M1, M2, M3, M4). Intel fonctionne mais c'est plus lent.
-- 4 GB d'espace disque libre (1.5 GB pour le modele de transcription, le reste pour les outils Apple et Homebrew).
+- 5 GB d'espace disque libre (modeles Parakeet et Whisper, outils Apple et Homebrew).
 - Une connexion internet stable.
 - Un micro (le micro interne du Mac suffit, externe c'est mieux pour la qualite).
 
@@ -77,9 +77,10 @@ Le script va :
 1. Verifier ton Mac et ton macOS.
 2. Verifier les outils Apple (deja installes a l'etape "Avant de commencer").
 3. Installer Homebrew si tu ne l'as pas. Ton mot de passe Mac sera demande.
-4. Installer les outils dont VoiceType a besoin : `whisper-cpp` pour la transcription, `ffmpeg` en secours pour le micro.
-5. Telecharger le modele de transcription (1.5 GB). Une barre de progression s'affiche. Si la connexion coupe, relance la commande `bash scripts/install.sh`, le telechargement reprendra ou il s'est arrete.
-6. Compiler VoiceType et l'installer dans Applications.
+4. Installer les outils dont VoiceType a besoin : `whisper-cpp` pour le moteur de secours, `ffmpeg` en secours pour le micro.
+5. Installer le moteur rapide Parakeet (11 MB, Apple Silicon uniquement). Son modele de 570 MB se telecharge en arriere-plan au premier lancement ; Whisper fonctionne pendant ce temps.
+6. Telecharger le modele Whisper de secours (1.5 GB). Une barre de progression s'affiche. Si la connexion coupe, relance la commande `bash scripts/install.sh`, le telechargement reprendra ou il s'est arrete.
+7. Compiler VoiceType et l'installer dans Applications.
 
 Compte 15 a 35 minutes pour cette etape.
 
@@ -144,7 +145,7 @@ Pour dicter :
 1. Place ton curseur la ou tu veux le texte (Mail, Notes, navigateur, Slack, ...).
 2. Maintiens la touche **Fn** (touche Globe en bas a gauche du clavier).
 3. Parle.
-4. Relache. Le texte apparait au bout de 1 a 2 secondes.
+4. Relache. Avec le moteur rapide, le texte apparait generalement en moins d'une seconde. VoiceType repasse automatiquement sur Whisper si Parakeet n'est pas disponible.
 
 Astuce : Fn + une autre touche (fleches, suppr) n'enregistre rien, c'est un raccourci.
 
@@ -152,7 +153,7 @@ Francais par defaut. Pour l'anglais ou un melange de langues : menu de la capsul
 
 ## Vocabulaire personnalise (optionnel)
 
-Si tu utilises souvent des noms propres ou termes techniques que Whisper ne reconnait pas, ajoute les a un fichier de vocabulaire :
+Si tu utilises souvent des noms propres ou termes techniques que Whisper ne reconnait pas, ajoute-les a un fichier de vocabulaire :
 
 ```
 mkdir -p ~/.voicetype
@@ -161,7 +162,7 @@ nano ~/.voicetype/vocabulary.txt
 
 Tape un mot ou une phrase par ligne. Sauvegarde avec **Ctrl+O**, Entree, puis **Ctrl+X** pour quitter nano.
 
-Effet immediat a la prochaine transcription.
+Effet immediat sur le moteur Whisper. Parakeet applique aussi quelques corrections typographiques automatiques.
 
 ## Si ca plante
 

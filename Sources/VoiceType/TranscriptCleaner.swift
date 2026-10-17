@@ -17,6 +17,12 @@ enum TranscriptCleaner {
         #"Thanks? (?:you )?for watching[.!]?\s*$"#,
     ]
 
+    /// Spelling slips of the Parakeet engine, fixed after the credits are removed.
+    private static let spellingFixes = [
+        (#"\b([Ii]l) ya\b"#, "$1 y a"),
+        (#"(?i)\bmvp\b"#, "MVP"),
+    ]
+
     /// Outputs made only of these words are discarded (whisper's reflex on silence).
     private static let courtesyWords: Set<String> = ["thank", "thanks", "you", "for", "watching"]
 
@@ -26,6 +32,9 @@ enum TranscriptCleaner {
             text = text.replacingOccurrences(
                 of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
         }
+        for (pattern, replacement) in spellingFixes {
+            text = text.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
+        }
         text = text.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -33,6 +42,22 @@ enum TranscriptCleaner {
             .components(separatedBy: CharacterSet.letters.inverted)
             .filter { !$0.isEmpty }
         if words.isEmpty || words.allSatisfy(courtesyWords.contains) { return "" }
-        return text
+        return typography(text)
+    }
+
+    /// Parakeet skips two conventions whisper follows: capital after a sentence end,
+    /// and the French space before ? and !. Idempotent on already correct text.
+    private static func typography(_ text: String) -> String {
+        var result = text.replacingOccurrences(
+            of: #"(?<=[^\s?!])([?!])"#, with: " $1", options: .regularExpression)
+        var capitalizeNext = true
+        result = String(result.map { char -> Character in
+            defer {
+                if ".?!".contains(char) { capitalizeNext = true }
+                else if !char.isWhitespace { capitalizeNext = false }
+            }
+            return capitalizeNext && char.isLetter ? Character(char.uppercased()) : char
+        })
+        return result
     }
 }

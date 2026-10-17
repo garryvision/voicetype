@@ -4,13 +4,24 @@ BUNDLE := dist/$(APP_NAME).app
 # Clément's stable certificate when present (keeps macOS permissions across builds),
 # ad-hoc signature otherwise (friends' Macs)
 SIGN_IDENTITY ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -q '"VoiceType Signing"' && echo "VoiceType Signing" || echo -)
-VERSION := 0.3.0
+VERSION := 0.4.0
 PLIST := $(BUNDLE)/Contents/Info.plist
 SWIFT_FILES := Sources/VoiceType/*.swift
 FRAMEWORKS := -framework AppKit -framework AVFoundation -framework Quartz \
               -framework Accelerate -framework ApplicationServices
 
-.PHONY: build install run stop uninstall clean
+.PHONY: build test install run stop uninstall clean
+
+## Test : standalone Swift tests (Command Line Tools do not ship XCTest)
+test:
+	@mkdir -p .build/tests
+	swiftc -o .build/tests/VoiceTypeTests \
+		Sources/VoiceType/TranscriptCleaner.swift \
+		Sources/VoiceType/ProcessRunner.swift \
+		Sources/VoiceType/ComparisonAudio.swift \
+		Tests/VoiceTypeTests/main.swift
+	@.build/tests/VoiceTypeTests
+	@bash Tests/test-install-parakeet.sh
 
 ## Build : compile + bundle + sign
 build:

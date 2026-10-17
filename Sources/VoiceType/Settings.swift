@@ -16,6 +16,17 @@ enum Settings {
         store.string(forKey: "audioBackend") ?? "engine"
     }
 
+    /// "parakeet" (Neural Engine, ~8x faster, used when installed) or "whisper" (more accurate).
+    static var engine: String {
+        get { store.string(forKey: "engine") ?? "parakeet" }
+        set { store.set(newValue, forKey: "engine") }
+    }
+
+    /// Diagnostic opt-in: re-run Whisper after Parakeet and log both texts.
+    static var compareEngines: Bool {
+        store.bool(forKey: "compareEngines")
+    }
+
     /// Silero voice activity detection: trims silences, which cause most whisper hallucinations.
     static var vadEnabled: Bool {
         store.object(forKey: "vad") as? Bool ?? true

@@ -9,6 +9,13 @@ final class Transcriber {
     private var modelPath: URL?
     private var isReady = false
 
+    private let parakeet = ParakeetEngine()
+    private var parakeetReady = false
+    /// Background whisper runs (Parakeet warm-up, comparisons): never on the dictation path.
+    private let backgroundQueue = DispatchQueue(label: "com.clement.voicetype.background", qos: .utility)
+    /// Engine that produced the last result, for logs and comparison.
+    private(set) var lastEngine = "whisper"
+
     /// Shorter captures are accidental taps, not dictations.
     static let minDuration: TimeInterval = 0.8
     /// Last capture, kept to diagnose a failed dictation (overwritten each time).
@@ -58,15 +65,26 @@ final class Transcriber {
             isReady = true
             Log.write("Ready (language: \(Settings.language), VAD: \(vadModelPath != nil && Settings.vadEnabled))")
         }
-        return isReady
+        warmUpParakeet()
+        return isReady || parakeet.isAvailable
+    }
+
+    private func warmUpParakeet() {
+        guard parakeet.isAvailable else { return }
+        backgroundQueue.async { [self] in
+            let silence = modelDir.deletingLastPathComponent().appendingPathComponent("warmup.wav")
+            let started = Date()
+            _ = writeWAV(samples: [Float](repeating: 0, count: 16000), sampleRate: 16000, to: silence)
+            let ok = parakeet.warmUp(silentWav: silence)
+            try? FileManager.default.removeItem(at: silence)
+            DispatchQueue.main.async { self.parakeetReady = ok }
+            Log.write(ok ? "Parakeet ready (\(String(format: "%.1f", Date().timeIntervalSince(started)))s)"
+                         : "Parakeet warm-up failed — whisper only")
+        }
     }
 
     /// Returns transcribed text, or nil on error (timeout, crash, etc.)
     func transcribe(samples: [Float]) -> TranscriptionResult {
-        guard isReady, let binary = whisperBinary, let model = modelPath else {
-            return .error("Whisper not ready")
-        }
-
         let duration = Double(samples.count) / 16000.0
         if duration < Self.minDuration {
             return .empty
@@ -77,6 +95,22 @@ final class Transcriber {
             return .error("Failed to write WAV")
         }
 
+        if Settings.engine == "parakeet", parakeetReady {
+            let result = clean(parakeet.transcribe(wav: wav))
+            if case .success = result {
+                lastEngine = "parakeet"
+                return result
+            }
+            Log.write("Parakeet gave no text — falling back to whisper")
+        }
+        lastEngine = "whisper"
+        return transcribeWithWhisper(wav: wav)
+    }
+
+    private func transcribeWithWhisper(wav: URL) -> TranscriptionResult {
+        guard isReady, let binary = whisperBinary, let model = modelPath else {
+            return .error("Whisper not ready")
+        }
         let useVAD = Settings.vadEnabled && vadModelPath != nil
         let result = transcribe(wav: wav, binary: binary, model: model, vad: useVAD)
         // VAD can reject quiet speech (whispering, noisy train): never let it cost a dictation
@@ -87,8 +121,29 @@ final class Transcriber {
         return result
     }
 
+    /// Whisper on a copy of the last recording, after Parakeet already pasted its text.
+    /// Logs both versions side by side to decide on evidence which engine to keep.
+    func compareWithWhisper() {
+        guard isReady else { return }
+        guard let comparisonURL = try? ComparisonAudio.makeCopy(of: Self.lastRecordingURL) else {
+            Log.write("Compare skipped: recording copy failed")
+            return
+        }
+        backgroundQueue.async { [self] in
+            defer { try? FileManager.default.removeItem(at: comparisonURL) }
+            let started = Date()
+            let result = transcribeWithWhisper(wav: comparisonURL)
+            let elapsed = String(format: "%.1f", Date().timeIntervalSince(started))
+            Log.write("Compare whisper (\(elapsed)s): '\(result.text ?? "")'")
+        }
+    }
+
     private func transcribe(wav: URL, binary: String, model: URL, vad: Bool) -> TranscriptionResult {
-        switch run(binary: binary, arguments: arguments(model: model, wav: wav, vad: vad)) {
+        clean(ProcessRunner.run(binary, arguments(model: model, wav: wav, vad: vad), timeout: transcriptionTimeout))
+    }
+
+    private func clean(_ outcome: ProcessRunner.Outcome) -> TranscriptionResult {
+        switch outcome {
         case .failure(let reason):
             return .error(reason)
         case .success(let raw):
@@ -129,39 +184,6 @@ final class Transcriber {
         return args
     }
 
-    private enum RunOutcome { case success(String), failure(String) }
-
-    private func run(binary: String, arguments: [String]) -> RunOutcome {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: binary)
-        process.arguments = arguments
-
-        let stdoutPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = FileHandle.nullDevice  // Prevent pipe deadlock
-
-        do {
-            try process.run()
-        } catch {
-            return .failure("whisper-cli failed: \(error.localizedDescription)")
-        }
-
-        // Read stdout before waiting (prevents pipe buffer deadlock)
-        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-
-        guard waitForExit(process, timeout: transcriptionTimeout) else {
-            process.terminate()
-            DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-            }
-            return .failure("Transcription timeout")
-        }
-        guard process.terminationStatus == 0 else {
-            return .failure("whisper-cli exit \(process.terminationStatus)")
-        }
-        return .success(String(data: outputData, encoding: .utf8) ?? "")
-    }
-
     // MARK: - Result type
 
     enum TranscriptionResult {
@@ -191,17 +213,6 @@ final class Transcriber {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
         return words.joined(separator: ", ")
-    }
-
-    // MARK: - Process timeout
-
-    private func waitForExit(_ proc: Process, timeout: TimeInterval) -> Bool {
-        let semaphore = DispatchSemaphore(value: 0)
-        DispatchQueue.global(qos: .utility).async {
-            proc.waitUntilExit()
-            semaphore.signal()
-        }
-        return semaphore.wait(timeout: .now() + timeout) == .success
     }
 
     // MARK: - Model download

@@ -4,7 +4,7 @@ Briefing pour Claude Code. Ce fichier est lu automatiquement quand l'utilisateur
 
 ## Contexte
 
-VoiceType est un outil de dictee vocale local pour macOS, ecrit en Swift natif. L'utilisateur maintient la touche Fn (Globe), parle, relache : le texte est transcrit localement via whisper.cpp (GPU Metal) et colle dans l'application active.
+VoiceType est un outil de dictee vocale local pour macOS, ecrit en Swift natif. L'utilisateur maintient la touche Fn (Globe), parle, relache : le texte est transcrit localement par Parakeet v3 (Neural Engine) ou whisper.cpp en secours, puis colle dans l'application active.
 
 C'est une alternative gratuite, locale et privee a Wispr Flow et Superwhisper.
 
@@ -12,7 +12,8 @@ L'app a ete cree par Clement Lameley. Elle est partagee a un cercle restreint d'
 
 Stack technique :
 - Swift natif (Sources/VoiceType/)
-- whisper-cli via Homebrew pour la transcription
+- Parakeet TDT v3 via le CLI FluidAudio sur Apple Silicon (moteur principal, environ 0.5 s sur les dictes reelles testees)
+- whisper-cli via Homebrew (secours automatique et moteur unique sur Intel)
 - AVAudioEngine pour la capture micro (ffmpeg via Homebrew en secours automatique)
 - VAD Silero (modele de 885 KB telecharge par l'app au lancement) pour ignorer les silences
 - CGEvent tap pour la touche Fn
@@ -55,9 +56,10 @@ Le script va :
 2. Verifier les Xcode Command Line Tools (deja installes a l'etape 0).
 3. Installer Homebrew si absent (demande le mot de passe Mac).
 4. Installer whisper-cpp et ffmpeg via Homebrew.
-5. Telecharger le modele Whisper (1.5 GB) via curl avec reprise automatique en cas d'echec reseau. La barre de progression s'affiche dans le terminal.
-6. Compiler VoiceType.
-7. Copier l'app dans /Applications.
+5. Sur Apple Silicon, telecharger le paquet Parakeet signe par empreinte SHA-256 (11 MB). Son modele CoreML de 570 MB se telecharge en arriere-plan au premier lancement.
+6. Telecharger le modele Whisper de secours (1.5 GB) via curl avec reprise automatique. La barre de progression s'affiche dans le terminal.
+7. Compiler VoiceType.
+8. Copier l'app dans /Applications.
 
 Si le script echoue, lis le message d'erreur et propose une remediation precise. Ne devine pas.
 
@@ -109,7 +111,7 @@ Demande a l'utilisateur de tester :
 1. Ouvrir l'app Notes.
 2. Cliquer dans le corps de la note.
 3. Maintenir la touche Fn (Globe, en bas a gauche), dire "test un deux trois" en francais, relacher.
-4. Le texte doit apparaitre dans Notes au bout de 1 a 2 secondes.
+4. Le texte doit apparaitre dans Notes, generalement en moins d'une seconde avec Parakeet. Le journal indique `Result parakeet` ou `Result whisper`.
 
 Si la capsule ne s'agrandit pas quand l'utilisateur maintient Fn : permission Surveillance des entrees non active.
 
@@ -123,7 +125,7 @@ Quand l'utilisateur dit "mets a jour VoiceType" ou colle le message de mise a jo
 
 1. Trouver le dossier du projet. Par defaut `~/Downloads/voicetype`. S'il n'existe pas : `mdfind -name voicetype -onlyin ~ | grep -v Library | head`. Si introuvable, cloner a nouveau dans `~/Downloads` (`git clone https://github.com/garryvision/voicetype.git`).
 2. Recuperer la nouvelle version : `git pull`. Si git refuse a cause de modifications locales, montre-les (`git status`), explique-les, puis `git stash` avant de refaire `git pull` (ne jamais `git reset --hard` sans accord).
-3. Verifier la version : `git describe --tags` doit afficher la derniere version publiee (ex : v0.3.0).
+3. Verifier la version : `git describe --tags` doit afficher la derniere version publiee (ex : v0.4.0).
 4. Lancer `bash scripts/install.sh`. Le modele est deja la, le script le saute ; seule la compilation prend une minute.
 5. Permissions : apres chaque mise a jour, elles sont a redonner (signature ad hoc). Guide l'utilisateur, un panneau a la fois :
    - Reglages systeme > Confidentialite et securite > Accessibilite : selectionner VoiceType, bouton -.
@@ -132,7 +134,7 @@ Quand l'utilisateur dit "mets a jour VoiceType" ou colle le message de mise a jo
    - Rajouter VoiceType dans les deux listes (bouton +, choisir /Applications/VoiceType.app), puis relancer une derniere fois.
 6. Test : capsule en bas au centre ; en maintenant Fn, des barres bougent avec la voix ; au relachement, le texte arrive.
 
-Si la nouvelle version pose probleme : `git checkout v0.2.0 && bash scripts/install.sh` (meme etape 5 ensuite), et conseille de prevenir Clement avec le contenu de `tail -50 ~/.voicetype/voicetype.log`.
+Si la nouvelle version pose probleme : `git checkout v0.3.0 && bash scripts/install.sh` (meme etape 5 ensuite), et conseille de prevenir Clement avec le contenu de `tail -50 ~/.voicetype/voicetype.log`.
 
 ## Etats de la capsule (en bas au centre de l'ecran)
 
@@ -194,6 +196,15 @@ which whisper-cli ffmpeg
 
 Si l'un manque : `brew install whisper-cpp ffmpeg`.
 
+Pour verifier le moteur rapide :
+
+```bash
+ls -l ~/.voicetype/bin/fluidaudiocli
+grep -E "Parakeet ready|Result parakeet|falling back" ~/.voicetype/voicetype.log | tail -10
+```
+
+Si Parakeet manque ou echoue, relancer `bash scripts/install.sh`. VoiceType reste utilisable avec Whisper pendant ce temps.
+
 ### Le modele n'est pas la
 
 Si `~/.voicetype/models/ggml-large-v3-turbo.bin` n'existe pas ou fait moins de 1.5 GB :
@@ -234,7 +245,7 @@ mkdir -p ~/.voicetype && nano ~/.voicetype/vocabulary.txt
 
 Format : un mot ou une phrase par ligne. Lignes commencant par `#` sont des commentaires.
 
-Effet immediat a la prochaine transcription, pas besoin de redemarrer l'app.
+Effet immediat sur Whisper, pas besoin de redemarrer l'app. Parakeet n'utilise pas ce fichier dans la 0.4.0 : son option de vocabulaire ajoute environ 0.5 s, donc elle reste desactivee.
 
 ## Posture et limites
 

@@ -77,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard state == .recording else { return }
         recordingTimeout?.cancel()
         _ = recorder.stop()
+        Log.write("Cancelled (Fn shortcut)")
         finish()
     }
 
@@ -108,8 +109,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handle(_ result: Transcriber.TranscriptionResult, elapsed: TimeInterval) {
         switch result {
         case .success(let text):
-            Log.write("Result (\(String(format: "%.1f", elapsed))s): '\(text)'")
+            let engine = transcriber.lastEngine
+            Log.write("Result \(engine) (\(String(format: "%.2f", elapsed))s): '\(text)'")
             lastTranscript = text
+            if engine == "parakeet", Settings.compareEngines {
+                transcriber.compareWithWhisper()
+            }
             indicator.show(indicator.resting)  // the text appearing is the feedback
             injector.inject(text: text) {
                 DispatchQueue.main.async { self.state = .idle }
@@ -141,6 +146,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item(isPaused ? "Reprendre la dictée" : "Mettre en pause", #selector(togglePause)))
         menu.addItem(.separator())
 
+        let fastEngine = item("Moteur rapide (Parakeet)", #selector(toggleEngine))
+        fastEngine.state = Settings.engine == "parakeet" ? .on : .off
+        fastEngine.isEnabled = ParakeetEngine().isAvailable
+        menu.addItem(fastEngine)
+
         let autoLanguage = item("Détecter la langue automatiquement", #selector(toggleLanguage))
         autoLanguage.state = Settings.language == "auto" ? .on : .off
         menu.addItem(autoLanguage)
@@ -168,6 +178,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         isPaused.toggle()
         indicator.resting = isPaused ? .paused : .idle
         indicator.show(indicator.resting)
+    }
+
+    @objc private func toggleEngine() {
+        Settings.engine = Settings.engine == "parakeet" ? "whisper" : "parakeet"
+        indicator.flash(Settings.engine == "parakeet" ? "Moteur : rapide" : "Moteur : Whisper", isError: false)
     }
 
     @objc private func toggleLanguage() {

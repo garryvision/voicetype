@@ -125,7 +125,15 @@ if ! command -v ffmpeg &> /dev/null; then
   exit 1
 fi
 
-# 5. Telechargement du modele Whisper (avant le 1er lancement de l'app)
+# 5. Moteur rapide Parakeet (Apple Silicon uniquement, Whisper reste le secours)
+if [[ "$ARCH" == "arm64" ]]; then
+  info "Installation du moteur rapide Parakeet (11 MB)"
+  if ! bash "$REPO_DIR/scripts/install-parakeet.sh"; then
+    warn "Parakeet n'a pas pu etre installe. VoiceType utilisera Whisper normalement."
+  fi
+fi
+
+# 6. Telechargement du modele Whisper (avant le 1er lancement de l'app)
 # On le fait ici via curl (resume natif via -C -), pas dans l'app.
 # Avantages : barre de progression visible, retry automatique, reprise si la connexion coupe.
 info "Telechargement du modele Whisper (1.5 GB)"
@@ -172,7 +180,7 @@ if [ "${SKIP_DL:-0}" = "0" ]; then
   step "Modele telecharge ($((FINAL_SIZE / 1024 / 1024)) MB)"
 fi
 
-# 6. Build et install de l'app
+# 7. Build et install de l'app
 info "Compilation de VoiceType"
 cd "$REPO_DIR"
 make build
@@ -180,7 +188,7 @@ make build
 info "Installation dans /Applications"
 make install
 
-# 7. Recap permissions
+# 8. Recap permissions
 echo ""
 echo -e "${GREEN}${BOLD}Installation terminee.${NC}"
 echo ""
