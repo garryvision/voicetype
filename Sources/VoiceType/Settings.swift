@@ -27,6 +27,12 @@ enum Settings {
         store.bool(forKey: "compareEngines")
     }
 
+    /// Record from the Mac's built-in mic when the default input is a Bluetooth headset,
+    /// so music in AirPods keeps its quality. Disable: `defaults write ... avoidBluetoothMic -bool false`.
+    static var avoidBluetoothMic: Bool {
+        store.object(forKey: "avoidBluetoothMic") as? Bool ?? true
+    }
+
     /// Silero voice activity detection: trims silences, which cause most whisper hallucinations.
     static var vadEnabled: Bool {
         store.object(forKey: "vad") as? Bool ?? true

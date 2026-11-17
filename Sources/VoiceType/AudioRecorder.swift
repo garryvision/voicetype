@@ -65,6 +65,7 @@ final class AudioRecorder {
         // Always a fresh engine: reusing one after stop() is unreliable
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
+        selectInputDevice(of: inputNode)
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0,
@@ -95,6 +96,20 @@ final class AudioRecorder {
             engineFailed = true
             return false
         }
+    }
+
+    /// Points the engine at the built-in mic when the default input is Bluetooth.
+    /// Must run before the input format is read. On failure the default input is kept.
+    private func selectInputDevice(of inputNode: AVAudioInputNode) {
+        guard let device = InputDeviceSelector.preferredDevice(),
+              let unit = inputNode.audioUnit else { return }
+        var id = device.id
+        let status = AudioUnitSetProperty(
+            unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+            &id, UInt32(MemoryLayout<AudioDeviceID>.size))
+        Log.write(status == noErr
+            ? "Bluetooth default input: recording from \(device.name)"
+            : "Could not select \(device.name) (status \(status)), keeping default input")
     }
 
     private func append(_ buffer: AVAudioPCMBuffer, converter: AVAudioConverter,

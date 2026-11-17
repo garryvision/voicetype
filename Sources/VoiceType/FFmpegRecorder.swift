@@ -15,7 +15,9 @@ final class FFmpegRecorder {
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: ffmpegPath)
-        proc.arguments = ["-f", "avfoundation", "-i", ":0", "-ar", "16000", "-ac", "1", "-y", tempFile.path]
+        // ":0" is the first input; a Bluetooth default input is swapped for the built-in mic by name
+        let input = InputDeviceSelector.preferredDevice().map { ":\($0.name)" } ?? ":0"
+        proc.arguments = ["-f", "avfoundation", "-i", input, "-ar", "16000", "-ac", "1", "-y", tempFile.path]
         proc.standardOutput = FileHandle.nullDevice
         proc.standardError = FileHandle.nullDevice
 
