@@ -208,7 +208,7 @@ git pull
 bash scripts/install.sh
 ```
 
-Apres chaque mise a jour, les permissions macOS sont a redonner. Le script efface les anciennes (depuis la 0.4.2). Au lancement, VoiceType ouvre sa fenetre "Autorisations" : clique "Autoriser" sur chaque ligne, active l'interrupteur de VoiceType dans le reglage qui s'ouvre, puis reviens a la fenetre. Elle se ferme seule quand les trois lignes sont vertes. Tu peux la rouvrir depuis le menu de la capsule > Autorisations.
+Apres chaque mise a jour, les permissions macOS sont a redonner. Depuis la 0.4.3, plus besoin des boutons - et + : l'installation et le bouton "Autoriser" effacent les anciennes. Au lancement, VoiceType ouvre sa fenetre "Autorisations" : clique "Autoriser" sur chaque ligne, active l'interrupteur de VoiceType dans le reglage qui s'ouvre, puis reviens a la fenetre. Elle se ferme seule quand les trois lignes sont vertes. Tu peux la rouvrir depuis le menu de la capsule > Autorisations.
 
 C'est une limitation de macOS quand l'application change de signature, pas un bug.
 

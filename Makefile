@@ -4,7 +4,7 @@ BUNDLE := dist/$(APP_NAME).app
 # Clément's stable certificate when present (keeps macOS permissions across builds),
 # ad-hoc signature otherwise (friends' Macs)
 SIGN_IDENTITY ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -q '"VoiceType Signing"' && echo "VoiceType Signing" || echo -)
-VERSION := 0.4.2
+VERSION := 0.4.3
 PLIST := $(BUNDLE)/Contents/Info.plist
 SWIFT_FILES := Sources/VoiceType/*.swift
 # Build for the 3 latest macOS (14 Sonoma, 15 Sequoia, 26 Tahoe), whatever the Mac building it:
@@ -57,6 +57,15 @@ install: build
 	@sleep 1
 	@ditto $(BUNDLE) /Applications/$(APP_NAME).app
 	@codesign --verify --strict /Applications/$(APP_NAME).app
+	@# Ad hoc signature = a new app for macOS at every build: drop the stale permission entries
+	@# (switched on but void) so the new VoiceType can be listed and switched on in their place
+	@if [ "$(SIGN_IDENTITY)" = "-" ]; then \
+		for service in Accessibility ListenEvent; do \
+			tccutil reset $$service com.clement.voicetype >/dev/null 2>&1 \
+				&& echo "Old $$service permission cleared" \
+				|| echo "Could not clear $$service: VoiceType will retry when you click Autoriser"; \
+		done; \
+	fi
 	@echo "Installed $(VERSION). Run: make run"
 
 ## Run

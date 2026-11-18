@@ -188,17 +188,7 @@ make build
 info "Installation dans /Applications"
 make install
 
-# 8. Permissions perimees : une signature ad hoc change a chaque compilation, et macOS
-# garde l'interrupteur allume pour l'ancienne app alors qu'il ne vaut plus rien.
-# On efface ces entrees pour que VoiceType les redemande proprement.
-BUNDLE_ID="com.clement.voicetype"
-if codesign -dv "/Applications/$APP_NAME.app" 2>&1 | grep -q "Signature=adhoc"; then
-  info "Remise a zero des anciennes permissions (signature ad hoc)"
-  for service in Accessibility ListenEvent; do
-    tccutil reset "$service" "$BUNDLE_ID" > /dev/null 2>&1 \
-      || warn "Impossible de reinitialiser $service : retire VoiceType a la main (bouton -)."
-  done
-fi
+# 8. Les permissions perimees (signature ad hoc) sont effacees par make install.
 
 # 9. Recap permissions
 echo ""

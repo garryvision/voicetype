@@ -48,21 +48,51 @@ enum Permission: CaseIterable {
         }
     }
 
-    /// Lists VoiceType in the panel (so the user only has to flip the switch), then opens it.
-    func request() {
+    /// TCC service name understood by tccutil.
+    private var tccService: String? {
         switch self {
-        case .microphone:
-            if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-                AVCaptureDevice.requestAccess(for: .audio) { _ in }
-                return  // macOS shows its own Allow dialog
+        case .microphone: return nil
+        case .accessibility: return "Accessibility"
+        case .inputMonitoring: return "ListenEvent"
+        }
+    }
+
+    /// Clears the stale entry, lists this VoiceType in the panel (so the user only has to
+    /// flip the switch), then opens it. Only called while the permission is missing.
+    func request() {
+        if self == .microphone, AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+            return  // macOS shows its own Allow dialog
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            clearStaleEntry()
+            DispatchQueue.main.async {
+                register()
+                if let url = URL(string: pane) { NSWorkspace.shared.open(url) }
             }
+        }
+    }
+
+    /// With an ad hoc signature every update is a new app for macOS, yet the list keeps the old
+    /// entry switched on: it looks granted but applies to nothing. Removing it lets the new
+    /// VoiceType take its place, so nobody has to use the - and + buttons.
+    private func clearStaleEntry() {
+        guard let service = tccService, let id = Bundle.main.bundleIdentifier else { return }
+        switch ProcessRunner.run("/usr/bin/tccutil", ["reset", service, id], timeout: 5) {
+        case .success: Log.write("Cleared stale \(service) entry")
+        case .failure(let reason): Log.write("Could not clear \(service) entry: \(reason)")
+        }
+    }
+
+    private func register() {
+        switch self {
+        case .microphone: break
         case .accessibility:
             let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-            _ = AXIsProcessTrustedWithOptions([key: false] as CFDictionary)
+            _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
         case .inputMonitoring:
             CGRequestListenEventAccess()
         }
-        if let url = URL(string: pane) { NSWorkspace.shared.open(url) }
     }
 
     static var allGranted: Bool { allCases.allSatisfy(\.isGranted) }
