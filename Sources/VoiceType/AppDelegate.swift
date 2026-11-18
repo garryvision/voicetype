@@ -14,9 +14,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let maxRecordingDuration: TimeInterval = 300  // safety net; longest real dictation: 158 s
     private var recordingTimeout: DispatchWorkItem?
+    private let hotkeyRetryInterval: TimeInterval = 2
+    private var hotkeyRetry: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.rotateIfNeeded()
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        Log.write("Launch \(version) from \(Bundle.main.bundlePath)")
+        LaunchGuard.terminateOtherInstances()
+        LaunchGuard.requestAccessibilityIfNeeded()
         recorder.cleanupStaleTempFiles()
 
         indicator = StatusIndicator()
@@ -37,7 +43,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onRelease: { [weak self] in self?.stopRecording() },
             onCancel: { [weak self] in self?.cancelRecording() }
         )
-        hotkey.start()
+        startHotkey()
+    }
+
+    /// Without Input Monitoring the Fn key is deaf: say so in the capsule and retry until granted,
+    /// so the user never has to guess or relaunch.
+    private func startHotkey() {
+        if hotkey.start() { return }
+        let blocked = IndicatorState.message("Fn bloquée : autorise Surveillance des entrées", isError: true)
+        indicator.resting = blocked
+        indicator.show(blocked)
+        LaunchGuard.requestInputMonitoring()
+
+        hotkeyRetry = Timer.scheduledTimer(withTimeInterval: hotkeyRetryInterval, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            guard self.hotkey.start() else { return }
+            timer.invalidate()
+            self.indicator.resting = self.isPaused ? .paused : .idle
+            self.indicator.flash("Touche Fn prête", isError: false)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -188,7 +188,19 @@ make build
 info "Installation dans /Applications"
 make install
 
-# 8. Recap permissions
+# 8. Permissions perimees : une signature ad hoc change a chaque compilation, et macOS
+# garde l'interrupteur allume pour l'ancienne app alors qu'il ne vaut plus rien.
+# On efface ces entrees pour que VoiceType les redemande proprement.
+BUNDLE_ID="com.clement.voicetype"
+if codesign -dv "/Applications/$APP_NAME.app" 2>&1 | grep -q "Signature=adhoc"; then
+  info "Remise a zero des anciennes permissions (signature ad hoc)"
+  for service in Accessibility ListenEvent; do
+    tccutil reset "$service" "$BUNDLE_ID" > /dev/null 2>&1 \
+      || warn "Impossible de reinitialiser $service : retire VoiceType a la main (bouton -)."
+  done
+fi
+
+# 9. Recap permissions
 echo ""
 echo -e "${GREEN}${BOLD}Installation terminee.${NC}"
 echo ""
@@ -199,20 +211,21 @@ echo -e "${BOLD}Si macOS te dit 'developer cannot be verified' (macOS 15+) :${NC
 echo "  Va dans Reglages systeme > Confidentialite et securite,"
 echo "  descend en bas, clique 'Ouvrir quand meme' a cote de VoiceType."
 echo ""
-echo -e "${BOLD}Etape 2 : Autorise 3 permissions${NC}"
+echo -e "${BOLD}Etape 2 : Autorise 3 permissions (a refaire apres chaque mise a jour)${NC}"
+echo ""
+echo "  VoiceType les demande lui-meme au lancement et ouvre le bon reglage."
 echo ""
 echo "  1. Microphone : une fenetre Apple va le demander, clique 'Autoriser'."
 echo ""
-echo "  2. Accessibilite : Reglages systeme > Confidentialite et securite > Accessibilite."
-echo "     Clique le cadenas en bas, tape ton mot de passe Mac. Bouton +,"
-echo "     choisis VoiceType dans /Applications, valide. Active l'interrupteur."
+echo "  2. Accessibilite : clique 'Ouvrir Reglages systeme' dans la fenetre Apple,"
+echo "     puis active l'interrupteur de VoiceType (mot de passe Mac si demande)."
 echo ""
-echo "  3. Surveillance des entrees (Input Monitoring) : meme procedure."
+echo "  3. Surveillance des entrees : la capsule affiche 'Fn bloquee' et le reglage"
+echo "     s'ouvre. Active l'interrupteur de VoiceType. Si macOS propose"
+echo "     'Quitter et rouvrir', accepte. La capsule affiche ensuite 'Touche Fn prete'."
 echo ""
-echo -e "${BOLD}Etape 3 : Quitte et relance VoiceType${NC}"
-echo "  killall VoiceType ; open /Applications/VoiceType.app"
-echo ""
-echo "  (Les permissions ne prennent effet qu'au prochain lancement.)"
+echo "  Si VoiceType n'apparait pas dans une liste : bouton +, choisis"
+echo "  /Applications/VoiceType.app, active l'interrupteur."
 echo ""
 echo -e "${BOLD}Utilisation${NC}"
 echo "  Maintiens la touche Fn (Globe, en bas a gauche du clavier), parle, relache."

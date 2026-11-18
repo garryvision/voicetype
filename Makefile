@@ -4,7 +4,7 @@ BUNDLE := dist/$(APP_NAME).app
 # Clément's stable certificate when present (keeps macOS permissions across builds),
 # ad-hoc signature otherwise (friends' Macs)
 SIGN_IDENTITY ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -q '"VoiceType Signing"' && echo "VoiceType Signing" || echo -)
-VERSION := 0.4.1
+VERSION := 0.4.2
 PLIST := $(BUNDLE)/Contents/Info.plist
 SWIFT_FILES := Sources/VoiceType/*.swift
 FRAMEWORKS := -framework AppKit -framework AVFoundation -framework CoreAudio -framework Quartz \

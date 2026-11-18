@@ -20,7 +20,10 @@ final class HotkeyManager {
         stop()
     }
 
-    func start() {
+    /// Returns false when macOS refuses the tap (Input Monitoring missing or stale).
+    @discardableResult
+    func start() -> Bool {
+        guard eventTap == nil else { return true }
         let eventMask: CGEventMask = (1 << CGEventType.flagsChanged.rawValue)
             | (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.keyUp.rawValue)
@@ -40,14 +43,15 @@ final class HotkeyManager {
             Log.write("Failed to create event tap — grant Accessibility and Input Monitoring")
             retained.release()
             retainedSelf = nil
-            return
+            return false
         }
 
         eventTap = tap
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        NSLog("VoiceType: Listening for Fn/Globe")
+        Log.write("Listening for Fn/Globe")
+        return true
     }
 
     func stop() {

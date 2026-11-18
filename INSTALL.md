@@ -208,12 +208,14 @@ git pull
 bash scripts/install.sh
 ```
 
-Apres chaque mise a jour, les permissions macOS sont a redonner (les interrupteurs restent allumes mais ne marchent plus). Procedure :
+Apres chaque mise a jour, les permissions macOS sont a redonner. Le script efface les anciennes (depuis la 0.4.2), puis :
 
-1. Reglages systeme > Confidentialite et securite > Accessibilite : retire VoiceType (selectionne, bouton -).
-2. Idem pour Surveillance des entrees.
-3. Relance VoiceType (`killall VoiceType ; open /Applications/VoiceType.app`). Si macOS redemande le micro, clique Autoriser.
-4. Re-ajoute VoiceType dans les 2 listes via le bouton +, puis relance une derniere fois.
+1. Lance VoiceType (`open /Applications/VoiceType.app`). Une seule copie tourne : la nouvelle arrete l'ancienne.
+2. Accessibilite : dans la fenetre Apple, clique "Ouvrir Reglages systeme" et active l'interrupteur de VoiceType.
+3. Surveillance des entrees : la capsule affiche "Fn bloquee" et le reglage s'ouvre. Active l'interrupteur ; si macOS propose "Quitter et rouvrir", accepte. La capsule affiche "Touche Fn prete".
+4. Micro : clique Autoriser au premier enregistrement.
+
+Si VoiceType n'apparait pas dans une liste : bouton +, choisis /Applications/VoiceType.app.
 
 C'est une limitation de macOS quand l'application change de signature, pas un bug.
 

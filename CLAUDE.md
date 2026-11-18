@@ -125,16 +125,16 @@ Quand l'utilisateur dit "mets a jour VoiceType" ou colle le message de mise a jo
 
 1. Trouver le dossier du projet. Par defaut `~/Downloads/voicetype`. S'il n'existe pas : `mdfind -name voicetype -onlyin ~ | grep -v Library | head`. Si introuvable, cloner a nouveau dans `~/Downloads` (`git clone https://github.com/garryvision/voicetype.git`).
 2. Recuperer la nouvelle version : `git pull`. Si git refuse a cause de modifications locales, montre-les (`git status`), explique-les, puis `git stash` avant de refaire `git pull` (ne jamais `git reset --hard` sans accord).
-3. Verifier la version : `git describe --tags` doit afficher la derniere version publiee (ex : v0.4.1).
-4. Lancer `bash scripts/install.sh`. Le modele est deja la, le script le saute ; seule la compilation prend une minute.
-5. Permissions : apres chaque mise a jour, elles sont a redonner (signature ad hoc). Guide l'utilisateur, un panneau a la fois :
-   - Reglages systeme > Confidentialite et securite > Accessibilite : selectionner VoiceType, bouton -.
-   - Idem dans Surveillance des entrees.
-   - `killall VoiceType ; open /Applications/VoiceType.app`, autoriser le micro si macOS le demande.
-   - Rajouter VoiceType dans les deux listes (bouton +, choisir /Applications/VoiceType.app), puis relancer une derniere fois.
-6. Test : capsule en bas au centre ; en maintenant Fn, des barres bougent avec la voix ; au relachement, le texte arrive.
+3. Verifier la version : `git describe --tags` doit afficher la derniere version publiee (ex : v0.4.2).
+4. Lancer `bash scripts/install.sh`. Le modele est deja la, le script le saute ; seule la compilation prend une minute. Depuis la 0.4.2, le script efface les anciennes permissions devenues invalides (signature ad hoc) : plus besoin du bouton -.
+5. Permissions : `open /Applications/VoiceType.app`. Une seule copie de VoiceType peut tourner : la nouvelle arrete l'ancienne. L'app demande elle-meme les permissions ; guide l'utilisateur, un panneau a la fois :
+   - Fenetre Apple Accessibilite : "Ouvrir Reglages systeme", activer l'interrupteur de VoiceType.
+   - La capsule affiche "Fn bloquee : autorise Surveillance des entrees" et le reglage s'ouvre : activer l'interrupteur. Si macOS propose "Quitter et rouvrir", accepter. La capsule affiche "Touche Fn prete".
+   - Micro : "Autoriser" au premier enregistrement.
+   - Si VoiceType n'apparait pas dans une liste : bouton +, choisir /Applications/VoiceType.app.
+6. Test : capsule en bas au centre ; en maintenant Fn, des barres bougent avec la voix ; au relachement, le texte arrive. Si la touche Fn reste muette, `grep -E "Launch|Stopping|Listening|Failed" ~/.voicetype/voicetype.log | tail` montre quelle copie tourne et si macOS refuse l'ecoute.
 
-Si la nouvelle version pose probleme : `git checkout v0.4.0 && bash scripts/install.sh` (meme etape 5 ensuite), et conseille de prevenir Clement avec le contenu de `tail -50 ~/.voicetype/voicetype.log`.
+Si la nouvelle version pose probleme : `git checkout v0.4.1 && bash scripts/install.sh` (meme etape 5 ensuite), et conseille de prevenir Clement avec le contenu de `tail -50 ~/.voicetype/voicetype.log`.
 
 ## Etats de la capsule (en bas au centre de l'ecran)
 
