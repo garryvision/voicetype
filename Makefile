@@ -7,6 +7,9 @@ SIGN_IDENTITY ?= $(shell security find-identity -p codesigning 2>/dev/null | gre
 VERSION := 0.4.2
 PLIST := $(BUNDLE)/Contents/Info.plist
 SWIFT_FILES := Sources/VoiceType/*.swift
+# Build for the 3 latest macOS (14 Sonoma, 15 Sequoia, 26 Tahoe), whatever the Mac building it:
+# the compiler then refuses any API missing on the oldest one
+TARGET := $(shell uname -m)-apple-macos14.0
 FRAMEWORKS := -framework AppKit -framework AVFoundation -framework CoreAudio -framework Quartz \
               -framework Accelerate -framework ApplicationServices
 
@@ -26,7 +29,7 @@ test:
 ## Build : compile + bundle + sign
 build:
 	@mkdir -p dist/$(APP_NAME).app/Contents/MacOS
-	swiftc -o dist/$(APP_NAME) $(FRAMEWORKS) -O $(SWIFT_FILES)
+	swiftc -target $(TARGET) -o dist/$(APP_NAME) $(FRAMEWORKS) -O $(SWIFT_FILES)
 	@cp dist/$(APP_NAME) $(BUNDLE)/Contents/MacOS/$(APP_NAME)
 	@if [ ! -f $(BUNDLE)/Contents/Info.plist ]; then \
 		/usr/libexec/PlistBuddy \
