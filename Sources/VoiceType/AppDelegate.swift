@@ -16,13 +16,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingTimeout: DispatchWorkItem?
     private let hotkeyRetryInterval: TimeInterval = 2
     private var hotkeyRetry: Timer?
+    private let permissions = PermissionsWindow()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.rotateIfNeeded()
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         Log.write("Launch \(version) from \(Bundle.main.bundlePath)")
         LaunchGuard.terminateOtherInstances()
-        LaunchGuard.requestAccessibilityIfNeeded()
         recorder.cleanupStaleTempFiles()
 
         indicator = StatusIndicator()
@@ -44,6 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onCancel: { [weak self] in self?.cancelRecording() }
         )
         startHotkey()
+        // `open -a VoiceType --args --permissions` forces the window (support, tests)
+        if !Permission.allGranted || CommandLine.arguments.contains("--permissions") { permissions.show() }
     }
 
     /// Without Input Monitoring the Fn key is deaf: say so in the capsule and retry until granted,
@@ -53,7 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let blocked = IndicatorState.message("Fn bloquée : autorise Surveillance des entrées", isError: true)
         indicator.resting = blocked
         indicator.show(blocked)
-        LaunchGuard.requestInputMonitoring()
 
         hotkeyRetry = Timer.scheduledTimer(withTimeInterval: hotkeyRetryInterval, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
@@ -179,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         autoLanguage.state = Settings.language == "auto" ? .on : .off
         menu.addItem(autoLanguage)
         menu.addItem(item("Modifier le vocabulaire…", #selector(openVocabulary)))
+        menu.addItem(item("Autorisations…", #selector(openPermissions)))
         menu.addItem(item("Ouvrir le journal", #selector(openLog)))
         menu.addItem(.separator())
         menu.addItem(item("Quitter VoiceType", #selector(quit)))
@@ -220,6 +222,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? "# Un mot ou une expression par ligne\n".write(to: url, atomically: true, encoding: .utf8)
         }
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func openPermissions() {
+        permissions.show()
     }
 
     @objc private func openLog() {

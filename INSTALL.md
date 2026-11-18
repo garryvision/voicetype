@@ -208,14 +208,7 @@ git pull
 bash scripts/install.sh
 ```
 
-Apres chaque mise a jour, les permissions macOS sont a redonner. Le script efface les anciennes (depuis la 0.4.2), puis :
-
-1. Lance VoiceType (`open /Applications/VoiceType.app`). Une seule copie tourne : la nouvelle arrete l'ancienne.
-2. Accessibilite : dans la fenetre Apple, clique "Ouvrir Reglages systeme" et active l'interrupteur de VoiceType.
-3. Surveillance des entrees : la capsule affiche "Fn bloquee" et le reglage s'ouvre. Active l'interrupteur ; si macOS propose "Quitter et rouvrir", accepte. La capsule affiche "Touche Fn prete".
-4. Micro : clique Autoriser au premier enregistrement.
-
-Si VoiceType n'apparait pas dans une liste : bouton +, choisis /Applications/VoiceType.app.
+Apres chaque mise a jour, les permissions macOS sont a redonner. Le script efface les anciennes (depuis la 0.4.2). Au lancement, VoiceType ouvre sa fenetre "Autorisations" : clique "Autoriser" sur chaque ligne, active l'interrupteur de VoiceType dans le reglage qui s'ouvre, puis reviens a la fenetre. Elle se ferme seule quand les trois lignes sont vertes. Tu peux la rouvrir depuis le menu de la capsule > Autorisations.
 
 C'est une limitation de macOS quand l'application change de signature, pas un bug.
 
